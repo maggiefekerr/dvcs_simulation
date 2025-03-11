@@ -124,7 +124,7 @@ def generate_bh_events(params):
     subprocess.run(cmd, check=True)
     
     # Handle filename truncation (dvcsgen uses first 8 characters)
-    base_prefix = params['filename'][:8]
+    base_prefix = params['filename'][:7]
     generated_files = glob.glob(f"{base_prefix}*")
     if generated_files:
         generated_files.sort(key=os.path.getmtime)
@@ -167,7 +167,7 @@ def generate_vgg_events(params):
     subprocess.run(cmd, check=True)
     
     # Handle filename truncation (dvcsgen uses first 8 characters)
-    base_prefix = params['filename'][:8]
+    base_prefix = params['filename'][:7]
     generated_files = glob.glob(f"{base_prefix}*")
     if generated_files:
         generated_files.sort(key=os.path.getmtime)
