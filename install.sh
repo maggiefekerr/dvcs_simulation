@@ -1,16 +1,14 @@
 #!/bin/bash
 
-# Load JLab environment modules
+# Load JLab environment
 source /etc/profile.d/modules.sh
-module purge
-module load python/3.9.7
-module load gcc/9.3.0
-
-# Python dependencies
-pip3 install --user cython numpy scipy gepard
+module load clas12
 
 # Build KM15 Cython module
 python3 setup.py build_ext --inplace
+
+# Install Python dependencies
+pip3 install --user cython numpy scipy gepard
 
 # Build dvcsgen
 cd dependencies/dvcsgen
@@ -18,6 +16,10 @@ make clean
 make
 chmod +x dvcsgen
 cd ../..
+
+# Set PYTHONPATH
+echo "export PYTHONPATH=\$PYTHONPATH:$(pwd)" >> ~/.bashrc
+source ~/.bashrc
 
 echo "Installation complete! Test with:"
 echo "python3 main.py --model km15 --trig 10 --fname test"

@@ -1,8 +1,10 @@
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from km15gen import genOneEvent
 import argparse
 import numpy as np
 import time
-import os
 import subprocess
 
 M = 0.938272081
