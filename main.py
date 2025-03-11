@@ -121,7 +121,6 @@ def generate_bh_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
     dvcsgen_path = os.path.join(os.path.dirname(__file__), "dependencies", "dvcsgen", "dvcsgen")
     cmd = [
         dvcsgen_path,
-        "--docker",
         "--trig", str(params['trig']),
         "--beam", f"{params['Ed']:.3f}",
         "--x", f"{xBmin:.3f}", f"{xBmax:.3f}",
@@ -157,7 +156,6 @@ def generate_vgg_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
     dvcsgen_path = os.path.join(os.path.dirname(__file__), "dependencies", "dvcsgen", "dvcsgen")
     cmd = [
         dvcsgen_path,
-        "--docker",
         "--trig", str(params['trig']),
         "--beam", f"{params['Ed']:.3f}",
         "--x", f"{xBmin:.3f}", f"{xBmax:.3f}",
