@@ -27,7 +27,7 @@ def mag_3vec(v):
 
 def boost_4vec(vec, boost):
     """
-    Boost 'vec' by the 3-velocity 'boost' (in units of c).
+    Boost 'vec' by the 3-velocity 'boost' in units of c.
     Standard pure boost formula.
     """
     bx, by, bz = boost[0], boost[1], boost[2]
@@ -63,7 +63,7 @@ def compute_phi_trento_photon(e_4vec, ph_4vec, beam_4vec, target_4vec):
     1) Form q = beam - e  (virtual photon 4-vector).
     2) gN_4vec = q + target_4vec  => total gamma*-nucleon system.
     3) Boost e_4vec and ph_4vec (and q if needed) into that gN frame.
-    4) Define reference plane as vT = q_unit x e_unit, and compute the angle
+    4) Define reference plane: vT = q_unit x e_unit, then compute the angle
        between vT and (q_unit x ph_unit) using the sign from the triple product.
     5) Return angle in degrees in [0,360).
     """
@@ -93,7 +93,7 @@ def compute_phi_trento_photon(e_4vec, ph_4vec, beam_4vec, target_4vec):
         return 0.0
     vT_unit = vT / mag_vT
     
-    # Compute cross for photon: vTH = q_unit x ph_unit
+    # Compute for photon: vTH = q_unit x ph_unit
     vTH = np.cross(q_unit, ph_unit)
     mag_vTH = np.linalg.norm(vTH)
     if mag_vTH < 1e-14:
@@ -104,18 +104,18 @@ def compute_phi_trento_photon(e_4vec, ph_4vec, beam_4vec, target_4vec):
     cosPhi = max(-1.0, min(1.0, cosPhi))
     phi = math.acos(cosPhi)
     
-    # Determine sign using triple product: (e_unit x ph_unit) . q_unit
+    # Determine sign via triple product: (e_unit x ph_unit) dot q_unit
     triple = np.dot(np.cross(e_unit, ph_unit), q_unit)
     if triple < 0.0:
-        phi = 2.0*math.pi - phi
-    
+        phi = 2.0 * math.pi - phi
+        
     return math.degrees(phi)
 
 ##############################################################################
 # 3) Main plot function
 ##############################################################################
 def plot_kinematics(lund_file, beam_energy=10.604):
-    # Set up scientific style
+    # Set up style
     rcParams['font.family'] = 'serif'
     rcParams['font.size'] = 10
     rcParams['axes.labelsize'] = 12
@@ -126,7 +126,7 @@ def plot_kinematics(lund_file, beam_energy=10.604):
     rcParams['figure.dpi'] = 300
     rcParams['figure.autolayout'] = True
 
-    # Load LUND particle lines (14 columns per particle)
+    # Read LUND particle lines (14 columns per particle)
     try:
         with open(lund_file, 'r') as f:
             particle_lines = []
@@ -143,7 +143,7 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         print("No valid particle lines found.")
         return
 
-    # data columns: [index, lifetime, type, PID, parent, daughter, px, py, pz, E, mass, vx, vy, vz]
+    # Data columns: [index, lifetime, type, PID, parent, daughter, px, py, pz, E, mass, vx, vy, vz]
     try:
         electrons = data[data[:, 3] == 11]
         protons   = data[data[:, 3] == 2212]
@@ -157,8 +157,8 @@ def plot_kinematics(lund_file, beam_energy=10.604):
     def calc_theta(part):
         p = calc_momentum(part)
         return np.degrees(np.arccos(part[:, 8] / p))
-
-    # Calculate momentum and theta for each particle type
+    
+    # Calculate momentum and angles
     e_p = calc_momentum(electrons)
     e_theta = calc_theta(electrons)
     p_p = calc_momentum(protons)
@@ -166,11 +166,11 @@ def plot_kinematics(lund_file, beam_energy=10.604):
     gamma_p = calc_momentum(photons)
     gamma_theta = calc_theta(photons)
 
-    # Calculate DIS variables using the electron's total energy (column 10)
+    # Calculate DIS kinematics from electron total energy (col 10)
     try:
         nu = beam_energy - electrons[:, 9]
         Q2 = 4.0 * beam_energy * electrons[:, 9] * np.sin(np.radians(e_theta)/2.0)**2
-        y = nu / beam_energy
+        y_val = nu / beam_energy
         xB = Q2 / (2.0 * 0.938272 * nu)
         W = np.sqrt(0.938272**2 + 2.0*0.938272*nu - Q2)
         t = -(protons[:, 6]**2 + protons[:, 7]**2 + (protons[:, 8] - 0.938272)**2)
@@ -179,11 +179,10 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         print(f"Error calculating DIS kinematics: {e}")
         return
 
-    # Compute phiTrento for the final-state photon.
+    # Compute phiTrento for the photon using a 1:1 pairing of electrons and photons
     ne = len(electrons)
     nph = len(photons)
     nEvents = min(ne, nph)
-    # Define beam and target 4-vectors
     beam_4 = make_4vec(0.0, 0.0, beam_energy, beam_energy)
     target_4 = make_4vec(0.0, 0.0, 0.0, 0.938272)
     phi_trento_vals = []
@@ -196,12 +195,12 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         phi_trento_vals.append(phi_tr)
     phi_trento_vals = np.array(phi_trento_vals)
 
-    # Set up subplots: 2 rows, 6 columns.
-    # First row: e_p, e_theta, p_p, p_theta, gamma_p, gamma_theta.
-    # Second row: Q2, W, xB, -t, and phi (using phiTrento) in column 5; column 6 off.
-    fig, axs = plt.subplots(2, 6, figsize=(28, 10))
+    # Create subplots: 2 rows, 7 columns.
+    # Top row: 6 plots; leave the last one off.
+    # Bottom row: Q2, W, xB, -t, phi (Trento), y; last column off.
+    fig, axs = plt.subplots(2, 7, figsize=(28, 10))
 
-    def plot_hist(ax, dat, xlabel, x_range, bins=25):
+    def plot_hist(ax, dat, xlabel, x_range, bins=50):
         counts, bin_edges = np.histogram(dat, bins=bins, range=x_range)
         centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
         ax.errorbar(centers, counts, yerr=np.sqrt(counts), fmt='o',
@@ -211,22 +210,25 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         ax.set_xlim(x_range)
         ax.grid(alpha=0.3)
 
-    # First row plots
+    # Top row plots
     plot_hist(axs[0,0], e_p, r'$e_p$ (GeV)', (0, 12))
     plot_hist(axs[0,1], e_theta, r'$e_\theta$ (deg)', (0, 90))
     plot_hist(axs[0,2], p_p, r'$p_p$ (GeV)', (0, 4))
     plot_hist(axs[0,3], p_theta, r'$p_\theta$ (deg)', (0, 90))
     plot_hist(axs[0,4], gamma_p, r'$\gamma_p$ (GeV)', (0, 10))
     plot_hist(axs[0,5], gamma_theta, r'$\gamma_\theta$ (deg)', (0, 90))
+    axs[0,6].axis('off')
 
-    # Second row plots
+    # Bottom row plots
     plot_hist(axs[1,0], Q2, r'$Q^2$ (GeV$^2$)', (0, 12))
     plot_hist(axs[1,1], W, r'$W$ (GeV)', (1, 6))
     plot_hist(axs[1,2], xB, r'$x_B$', (0, 1))
     plot_hist(axs[1,3], -t, r'$-t$ (GeV$^2$)', (0, 1))
-    # Replace lab phi with phiTrento (labeled simply as phi)
+    # Use phiTrento in place of lab phi; label simply as phi
     plot_hist(axs[1,4], phi_trento_vals, r'$\phi$ (deg)', (0, 360))
-    axs[1,5].axis('off')
+    # New plot: inelasticity y, from 0 to 1.
+    plot_hist(axs[1,5], y_val, r'$y$', (0, 1))
+    axs[1,6].axis('off')
 
     fig.suptitle("Kinematics with Photon Trento $\\phi$")
     plt.subplots_adjust(wspace=0.3, hspace=0.4)
@@ -238,7 +240,7 @@ def plot_kinematics(lund_file, beam_energy=10.604):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Plot kinematics from Lund file, using final-state photon Trento phi',
+        description='Plot kinematics from Lund file, using final-state photon Trento phi and DIS y',
         add_help=False
     )
     parser.add_argument('input_file', nargs='?', help='Input .dat file')
