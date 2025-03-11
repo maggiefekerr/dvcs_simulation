@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import time
 import subprocess
+import glob
 
 # Add current directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -129,16 +130,16 @@ def generate_bh_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
         "--gpd", "101",
         "--y", f"{params['ymin']:.3f}", f"{params['ymax']:.3f}",
         "--w", f"{params['w2min']:.3f}",
-        "--file", f"{params['filename']}.dat",
+        "--file", params['filename'],  # Remove .dat from the filename here
         "--raster", "0.025",
         "--zpos", "-3",
         "--zwidth", "5",
         "--writef", "2",
-        # "--globalfit",
         "--ycol", "0.0005",
         "--weight",
         "--seed", f"{1000000*mode + 1000*params.get('bin',0) + params['seed']}",
-        "--bh", "1"
+        "--bh", "1",
+        "--nmax", "100000000"  # Prevent splitting into multiple files
     ]
     
     if params['rad']:
@@ -146,6 +147,11 @@ def generate_bh_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
     
     print("Executing BH:", " ".join(cmd))
     subprocess.run(cmd, check=True)
+    
+    # Rename the output file
+    generated_files = glob.glob(f"{params['filename']}.*.dat")
+    if generated_files:
+        os.rename(generated_files[0], f"{params['filename']}.dat")
 
 def generate_vgg_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
     """Generate VGG model events using dvcsgen"""
@@ -164,16 +170,16 @@ def generate_vgg_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
         "--gpd", "101",
         "--y", f"{params['ymin']:.3f}", f"{params['ymax']:.3f}",
         "--w", f"{params['w2min']:.3f}",
-        "--file", f"{params['filename']}.dat",
+        "--file", params['filename'],  # Remove .dat from the filename here
         "--raster", "0.025",
         "--zpos", "-3",
         "--zwidth", "5",
         "--writef", "2",
-        # "--globalfit",
         "--ycol", "0.0005",
         "--weight",
         "--seed", f"{1000000*mode + 1000*params.get('bin',0) + params['seed']}",
-        "--bh", "3"
+        "--bh", "3",
+        "--nmax", "100000000"  # Prevent splitting into multiple files
     ]
     
     if params['rad']:
@@ -181,6 +187,11 @@ def generate_vgg_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
     
     print("Executing VGG:", " ".join(cmd))
     subprocess.run(cmd, check=True)
+    
+    # Rename the output file
+    generated_files = glob.glob(f"{params['filename']}.*.dat")
+    if generated_files:
+        os.rename(generated_files[0], f"{params['filename']}.dat")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
