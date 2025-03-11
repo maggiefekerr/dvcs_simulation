@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Install system dependencies
-#sudo apt-get update
-#sudo apt-get install -y docker.io build-essential python3-dev
+# Load JLab modules
+module load python/3.9.7
+module load gcc/9.3.0
 
 # Python dependencies
-pip3 install --user setuptools cython numpy scipy gepard
+pip3 install --user cython numpy scipy gepard
 
 # Build KM15 Cython module
 python3 setup.py build_ext --inplace
