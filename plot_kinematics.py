@@ -30,7 +30,7 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         print(f"Error loading file: {e}")
         return
 
-    # Extract particles (assuming standard Lund format)
+    # Extract particles 
     try:
         electrons = data[data[:, 3] == 11]   # particle type 11 = electron
         protons = data[data[:, 3] == 2212]   # particle type 2212 = proton
