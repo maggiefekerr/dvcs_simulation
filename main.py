@@ -117,8 +117,8 @@ def dvcsgen_cmd(params, mode, bh_arg):
         "--raster", "0.025",
         "--zpos", "-3",
         "--zwidth", "5",
-        "--writef", "2",
-        "--ycol", "0.0005",
+        "--writef", "1",  # Changed from 2 to 1 (valid values: 0 or 1)
+        "--ycol", "0.005",  # Changed to match default from help text
         "--weight",
         "--seed", f"{1000000*mode + 1000*params.get('bin',0) + params['seed']}",
         bh_arg,
