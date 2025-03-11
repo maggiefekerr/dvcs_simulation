@@ -149,9 +149,12 @@ def generate_bh_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
     subprocess.run(cmd, check=True)
     
     # Rename the output file
-    generated_files = glob.glob(f"{params['filename']}.*.dat")
+    generated_files = glob.glob(f"{params['filename']}*.dat")  
+    # Match any .dat file starting with base name
     if generated_files:
+        generated_files.sort()  # Sort to handle multiple matches
         os.rename(generated_files[0], f"{params['filename']}.dat")
+        print(f"Renamed {generated_files[0]} to {params['filename']}.dat")
 
 def generate_vgg_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
     """Generate VGG model events using dvcsgen"""
@@ -189,9 +192,12 @@ def generate_vgg_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
     subprocess.run(cmd, check=True)
     
     # Rename the output file
-    generated_files = glob.glob(f"{params['filename']}.*.dat")
+    generated_files = glob.glob(f"{params['filename']}*.dat")  
+    # Match any .dat file starting with base name
     if generated_files:
+        generated_files.sort()  # Sort to handle multiple matches
         os.rename(generated_files[0], f"{params['filename']}.dat")
+        print(f"Renamed {generated_files[0]} to {params['filename']}.dat")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
