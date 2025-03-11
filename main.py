@@ -99,10 +99,10 @@ def generate_bh_events(params):
     cmd = [
         dvcsgen_path,
         "--trig", str(params['trig']),
-        "--beam", f"{params['Ed']:.3f}",
-        "--x", f"{xBmin:.3f}", f"{xBmax:.3f}",
-        "--q2", f"{Q2min:.3f}", f"{Q2max:.3f}",
-        "--t", f"{tmin:.3f}", f"{tmax:.3f}",
+        "--beam", f"{params['beam']:.3f}",  # Changed from Ed to beam
+        "--x", f"{params['xBmin']:.3f}", f"{params['xBmax']:.3f}",
+        "--q2", f"{params['Q2min']:.3f}", f"{params['Q2max']:.3f}",
+        "--t", f"{params['tmin']:.3f}", f"{params['tmax']:.3f}",
         "--gpd", "101",
         "--y", f"{params['ymin']:.3f}", f"{params['ymax']:.3f}",
         "--w", f"{params['w2min']:.3f}",
@@ -141,10 +141,10 @@ def generate_vgg_events(params):
     cmd = [
         dvcsgen_path,
         "--trig", str(params['trig']),
-        "--beam", f"{params['Ed']:.3f}",
-        "--x", f"{xBmin:.3f}", f"{xBmax:.3f}",
-        "--q2", f"{Q2min:.3f}", f"{Q2max:.3f}",
-        "--t", f"{tmin:.3f}", f"{tmax:.3f}",
+        "--beam", f"{params['beam']:.3f}",  # Changed from Ed to beam
+        "--x", f"{params['xBmin']:.3f}", f"{params['xBmax']:.3f}",
+        "--q2", f"{params['Q2min']:.3f}", f"{params['Q2max']:.3f}",
+        "--t", f"{params['tmin']:.3f}", f"{params['tmax']:.3f}",
         "--gpd", "101",
         "--y", f"{params['ymin']:.3f}", f"{params['ymax']:.3f}",
         "--w", f"{params['w2min']:.3f}",
