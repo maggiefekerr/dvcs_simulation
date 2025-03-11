@@ -1,0 +1,26 @@
+cat > .gitignore <<EOF
+# Python
+*.pyc
+__pycache__/
+build/
+*.so
+*.c
+
+# Compiled binaries
+*.o
+*.a
+
+# Data files
+*.dat
+*.data
+
+# Editor files
+.vscode/
+.idea/
+
+# System
+.DS_Store
+
+# Dependencies (should be built from source)
+dependencies/dvcsgen/dvcsgen
+EOF
