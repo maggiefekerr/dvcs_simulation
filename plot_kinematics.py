@@ -17,9 +17,15 @@ def plot_kinematics(lund_file, beam_energy=10.604):
     rcParams['figure.dpi'] = 300
     rcParams['figure.autolayout'] = True
 
-    # Load Lund file data
+    # Load Lund file data (skip header lines with 10 columns)
     try:
-        data = np.loadtxt(lund_file)
+        with open(lund_file, 'r') as f:
+            particle_lines = []
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) == 14:  # Select only particle lines
+                    particle_lines.append(line)
+        data = np.loadtxt(particle_lines)
     except Exception as e:
         print(f"Error loading file: {e}")
         return
