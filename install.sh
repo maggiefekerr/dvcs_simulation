@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Install system dependencies
-sudo apt-get update
-sudo apt-get install -y docker.io build-essential python3-dev
+#sudo apt-get update
+#sudo apt-get install -y docker.io build-essential python3-dev
 
 # Python dependencies
 pip3 install --user setuptools cython numpy scipy gepard
