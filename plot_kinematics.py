@@ -180,7 +180,6 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         return
 
     # Compute phiTrento for the final-state photon.
-    # We assume a 1:1 correspondence between electron and photon lines.
     ne = len(electrons)
     nph = len(photons)
     nEvents = min(ne, nph)
@@ -202,7 +201,7 @@ def plot_kinematics(lund_file, beam_energy=10.604):
     # Second row: Q2, W, xB, -t, and phi (using phiTrento) in column 5; column 6 off.
     fig, axs = plt.subplots(2, 6, figsize=(28, 10))
 
-    def plot_hist(ax, dat, xlabel, x_range, bins=50):
+    def plot_hist(ax, dat, xlabel, x_range, bins=25):
         counts, bin_edges = np.histogram(dat, bins=bins, range=x_range)
         centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
         ax.errorbar(centers, counts, yerr=np.sqrt(counts), fmt='o',
