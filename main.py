@@ -89,7 +89,7 @@ def generate_km15_events(params):
     
     print(f"Generated {len(output)} KM15 events in {time.time()-start_time:.2f}s")
 
-def generate_bh_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
+def generate_bh_events(params):
     """Generate Bethe-Heitler events using dvcsgen"""
     mode = 0
     if params['rad']:
@@ -131,7 +131,7 @@ def generate_bh_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
         os.rename(newest_file, f"{params['filename']}.dat")
         print(f"Renamed {newest_file} to {params['filename']}.dat")
 
-def generate_vgg_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
+def generate_vgg_events(params):
     """Generate VGG model events using dvcsgen"""
     mode = 3 if params['rad'] else 5
     if params.get('fringe'):
