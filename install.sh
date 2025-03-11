@@ -19,7 +19,6 @@ cd ../..
 
 # Set PYTHONPATH
 echo "export PYTHONPATH=\$PYTHONPATH:$(pwd)" >> ~/.bashrc
-# source cshrc
 
 echo "Installation complete! Test with:"
 echo "python3 main.py --model km15 --trig 10 --fname test"

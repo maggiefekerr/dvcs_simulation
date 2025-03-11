@@ -14,8 +14,6 @@ from km15gen import genOneEvent
 # Constants
 M = 0.938272081  # Proton mass in GeV/c²
 
-# Bin definitions and calculations [keep existing bin calculations]
-
 def main(args):
     """Main function to handle event generation"""
     # Set environment variables
