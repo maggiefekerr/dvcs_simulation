@@ -123,8 +123,9 @@ def generate_bh_events(params):
     print("Executing BH:", " ".join(cmd))
     subprocess.run(cmd, check=True)
     
-    # Rename output file
-    generated_files = glob.glob(f"{params['filename']}*")
+    # Handle filename truncation (dvcsgen uses first 8 characters)
+    base_prefix = params['filename'][:8]
+    generated_files = glob.glob(f"{base_prefix}*")
     if generated_files:
         generated_files.sort(key=os.path.getmtime)
         newest_file = generated_files[-1]
@@ -165,8 +166,9 @@ def generate_vgg_events(params):
     print("Executing VGG:", " ".join(cmd))
     subprocess.run(cmd, check=True)
     
-    # Rename output file
-    generated_files = glob.glob(f"{params['filename']}*")
+    # Handle filename truncation (dvcsgen uses first 8 characters)
+    base_prefix = params['filename'][:8]
+    generated_files = glob.glob(f"{base_prefix}*")
     if generated_files:
         generated_files.sort(key=os.path.getmtime)
         newest_file = generated_files[-1]
