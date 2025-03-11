@@ -58,11 +58,14 @@ def main(args):
         bin_scheme = np.loadtxt(os.path.join(os.path.dirname(__file__), bin_file), delimiter=',')
         xBmin, xBmax, Q2min, Q2max, tmin, tmax = bin_scheme[args.bin - 1]
     else:
-        xBmin, xBmax = args.xBmin, args.xBmax
-        Q2min, Q2max = args.Q2min, args.Q2max
-        tmin, tmax = args.tmin, args.tmax
+        xBmin = args.xBmin
+        xBmax = args.xBmax
+        Q2min = args.Q2min
+        Q2max = args.Q2max
+        tmin = args.tmin
+        tmax = args.tmax
 
-    # Common parameters
+    # Common parameters dictionary WITH SEED AND BIN
     params = {
         'ymin': args.ymin,
         'ymax': args.ymax,
@@ -70,7 +73,9 @@ def main(args):
         'rad': int(args.radgen),
         'trig': args.trig,
         'filename': args.fname,
-        'Ed': Ed
+        'Ed': Ed,
+        'seed': args.seed,  # Critical fix
+        'bin': args.bin      # Critical fix
     }
 
     # Model-specific handling
