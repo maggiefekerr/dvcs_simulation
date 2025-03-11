@@ -86,15 +86,15 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         ax.grid(alpha=0.3)
     
     # First row
-    plot_hist(axs[0,0], e_p, r'$e_p$ (GeV)', (0, 10))
+    plot_hist(axs[0,0], e_p, r'$e_p$ (GeV)', (0, 12))
     plot_hist(axs[0,1], e_theta, r'$e_\theta$ (deg)', (0, 90))
-    plot_hist(axs[0,2], p_p, r'$p_p$ (GeV)', (0, 10))
+    plot_hist(axs[0,2], p_p, r'$p_p$ (GeV)', (0, 4))
     plot_hist(axs[0,3], p_theta, r'$p_\theta$ (deg)', (0, 90))
     plot_hist(axs[0,4], gamma_p, r'$\gamma_p$ (GeV)', (0, 10))
     plot_hist(axs[0,5], gamma_theta, r'$\gamma_\theta$ (deg)', (0, 90))
     
     # Second row
-    plot_hist(axs[1,0], Q2, r'$Q^2$ (GeV$^2$)', (0, 11))
+    plot_hist(axs[1,0], Q2, r'$Q^2$ (GeV$^2$)', (0, 12))
     plot_hist(axs[1,1], W, r'$W$ (GeV)', (1, 6))
     plot_hist(axs[1,2], xB, r'$x_B$', (0, 1))
     plot_hist(axs[1,3], -t, r'$-t$ (GeV$^2$)', (0, 1))
