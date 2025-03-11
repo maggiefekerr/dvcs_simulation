@@ -89,27 +89,20 @@ def generate_km15_events(params):
     
     print(f"Generated {len(output)} KM15 events in {time.time()-start_time:.2f}s")
 
-def generate_bh_events(params):
-    """Generate Bethe-Heitler events"""
-    mode = 1 if params['fringe'] and params['rad'] else 0
-    dvcsgen_cmd(params, mode, "--bh 1")
-
-def generate_vgg_events(params):
-    """Generate VGG model events"""
-    mode = 3 if params['rad'] else 5
-    mode += 1 if params['fringe'] else 0
-    dvcsgen_cmd(params, mode, "--bh 3")
-
-def dvcsgen_cmd(params, mode, bh_arg):
-    """Common command builder for dvcsgen"""
+def generate_bh_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
+    """Generate Bethe-Heitler events using dvcsgen"""
+    mode = 0
+    if params['rad']:
+        mode = 1 if params.get('fringe') else 0
+    
     dvcsgen_path = os.path.join(os.path.dirname(__file__), "dependencies", "dvcsgen", "dvcsgen")
     cmd = [
         dvcsgen_path,
         "--trig", str(params['trig']),
-        "--beam", f"{params['beam']:.3f}",
-        "--x", f"{params['xBmin']:.3f}", f"{params['xBmax']:.3f}",
-        "--q2", f"{params['Q2min']:.3f}", f"{params['Q2max']:.3f}",
-        "--t", f"{params['tmin']:.3f}", f"{params['tmax']:.3f}",
+        "--beam", f"{params['Ed']:.3f}",
+        "--x", f"{xBmin:.3f}", f"{xBmax:.3f}",
+        "--q2", f"{Q2min:.3f}", f"{Q2max:.3f}",
+        "--t", f"{tmin:.3f}", f"{tmax:.3f}",
         "--gpd", "101",
         "--y", f"{params['ymin']:.3f}", f"{params['ymax']:.3f}",
         "--w", f"{params['w2min']:.3f}",
@@ -117,26 +110,68 @@ def dvcsgen_cmd(params, mode, bh_arg):
         "--raster", "0.025",
         "--zpos", "-3",
         "--zwidth", "5",
-        "--writef", "1",  # Changed from 2 to 1 (valid values: 0 or 1)
-        "--ycol", "0.005",  # Changed to match default from help text
+        "--writef", "2",
+        "--ycol", "0.0005",
         "--weight",
         "--seed", f"{1000000*mode + 1000*params.get('bin',0) + params['seed']}",
-        bh_arg,
-        "--nmax", "100000000"
+        "--bh", "1"
     ]
     
     if params['rad']:
         cmd += ["--radgen", "--vv2cut", "0.6", "--delta", "0.1", "--radstable"]
     
-    print("Executing:", " ".join(cmd))
+    print("Executing BH:", " ".join(cmd))
     subprocess.run(cmd, check=True)
     
-    # File renaming
-    generated_files = glob.glob(f"{params['filename']}*.dat")
+    # Rename output file
+    generated_files = glob.glob(f"{params['filename']}*")
     if generated_files:
-        generated_files.sort()
-        os.rename(generated_files[0], f"{params['filename']}.dat")
-        print(f"Renamed {generated_files[0]} to {params['filename']}.dat")
+        generated_files.sort(key=os.path.getmtime)
+        newest_file = generated_files[-1]
+        os.rename(newest_file, f"{params['filename']}.dat")
+        print(f"Renamed {newest_file} to {params['filename']}.dat")
+
+def generate_vgg_events(xBmin, xBmax, Q2min, Q2max, tmin, tmax, params):
+    """Generate VGG model events using dvcsgen"""
+    mode = 3 if params['rad'] else 5
+    if params.get('fringe'):
+        mode += 1
+    
+    dvcsgen_path = os.path.join(os.path.dirname(__file__), "dependencies", "dvcsgen", "dvcsgen")
+    cmd = [
+        dvcsgen_path,
+        "--trig", str(params['trig']),
+        "--beam", f"{params['Ed']:.3f}",
+        "--x", f"{xBmin:.3f}", f"{xBmax:.3f}",
+        "--q2", f"{Q2min:.3f}", f"{Q2max:.3f}",
+        "--t", f"{tmin:.3f}", f"{tmax:.3f}",
+        "--gpd", "101",
+        "--y", f"{params['ymin']:.3f}", f"{params['ymax']:.3f}",
+        "--w", f"{params['w2min']:.3f}",
+        "--file", params['filename'],
+        "--raster", "0.025",
+        "--zpos", "-3",
+        "--zwidth", "5",
+        "--writef", "2",
+        "--ycol", "0.0005",
+        "--weight",
+        "--seed", f"{1000000*mode + 1000*params.get('bin',0) + params['seed']}",
+        "--bh", "3"
+    ]
+    
+    if params['rad']:
+        cmd += ["--radgen", "--vv2cut", "0.6", "--delta", "0.1", "--radstable"]
+    
+    print("Executing VGG:", " ".join(cmd))
+    subprocess.run(cmd, check=True)
+    
+    # Rename output file
+    generated_files = glob.glob(f"{params['filename']}*")
+    if generated_files:
+        generated_files.sort(key=os.path.getmtime)
+        newest_file = generated_files[-1]
+        os.rename(newest_file, f"{params['filename']}.dat")
+        print(f"Renamed {newest_file} to {params['filename']}.dat")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
