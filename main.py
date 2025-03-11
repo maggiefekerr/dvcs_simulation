@@ -8,16 +8,15 @@ import subprocess
 import glob
 import math
 
-# Add current directory to Python path (for km15gen)
+# Add current directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from km15gen import genOneEvent
 
 # Constants
 M = 0.938272081  # Proton mass in GeV/c²
-me = 0.000511    # Electron mass in GeV
 
 ##############################################################################
-# Post-processing: Fix LUND file energy and mass columns for VGG/BH events
+# Post-processing: Fix LUND file energy and mass columns
 ##############################################################################
 def fix_lund_file(filename):
     """
@@ -25,46 +24,42 @@ def fix_lund_file(filename):
     recalculates column 10 (energy) and column 11 (mass) using:
        E = sqrt(px^2 + py^2 + pz^2 + m^2)
     with m set according to the particle's PDG code:
-      - For electrons (PID ±11): use m = 0.000511 GeV
-      - For protons (PID 2212): use m = 0.938272081 GeV
-      - For photons (PID 22): use m = 0.0 GeV (and energy = |p|)
-    All other lines (including header lines with 10 columns) are left unchanged.
+      - For electrons (PID ±11): use 0.000511 GeV
+      - For protons (PID 2212): use 0.938272081 GeV
+      - For photons (PID 22): use 0.0 GeV
+    Other particle types remain unchanged.
     The file is overwritten with the fixed version.
     """
     fixed_lines = []
     with open(filename, 'r') as f:
         for line in f:
             parts = line.strip().split()
-            # Check if this is a particle line (should have 14 columns)
+            # Check for particle lines (should have 14 columns)
             if len(parts) == 14:
                 try:
-                    # Extract momentum components (columns 7, 8, 9)
+                    # Extract momentum components from columns 7,8,9 (index 6,7,8)
                     px = float(parts[6])
                     py = float(parts[7])
                     pz = float(parts[8])
                     p_mod = math.sqrt(px*px + py*py + pz*pz)
-                    # Get PDG code from column 4
+                    # Get PID from column 4 (index 3)
                     pid = int(parts[3])
                     if abs(pid) == 11:
-                        mass = me
+                        mass = 0.000511
                     elif pid == 2212:
                         mass = M
                     elif pid == 22:
                         mass = 0.0
                     else:
-                        # For other particles, leave the values unchanged
-                        # (or you can add more cases if desired)
                         mass = float(parts[10])
                     
                     energy = math.sqrt(p_mod**2 + mass**2)
-                    # Format energy and mass in exponential format with 7 decimals
+                    # Update column 10 (index 9) and column 11 (index 10)
                     parts[9] = f"{energy: .7E}"
                     parts[10] = f"{mass: .7E}"
                 except Exception as err:
                     print(f"Error processing line: {line}\nError: {err}")
-            # Reconstruct the line (join with a space)
             fixed_lines.append(" ".join(parts))
-    # Write back the fixed file
     with open(filename, 'w') as f:
         for l in fixed_lines:
             f.write(l + "\n")
@@ -74,7 +69,7 @@ def fix_lund_file(filename):
 # Model-specific event generators
 ##############################################################################
 def generate_km15_events(params):
-    """Generate events using the KM15 model."""
+    """Generate events using KM15 model"""
     start_time = time.time()
     output = []
     while len(output) < params['trig']:
@@ -90,12 +85,11 @@ def generate_km15_events(params):
         if result:
             output.append(result)
     with open(f"{params['fname']}.dat", "w") as f:
-        # Remove the final newline if needed
         f.write("".join(output)[:-1])
     print(f"Generated {len(output)} KM15 events in {time.time()-start_time:.2f}s")
 
 def generate_bh_events(params):
-    """Generate events using the BH model via dvcsgen."""
+    """Generate Bethe-Heitler events using dvcsgen"""
     mode = 0
     if params['rad']:
         mode = 1 if params.get('fringe') else 0
@@ -124,19 +118,22 @@ def generate_bh_events(params):
         cmd += ["--radgen", "--vv2cut", "0.6", "--delta", "0.1", "--radstable"]
     print("Executing BH:", " ".join(cmd))
     subprocess.run(cmd, check=True)
-    # Handle filename truncation (dvcsgen uses the first 8 characters)
+    
+    # Combine all output files into one
     base_prefix = params['fname'][:7]
-    generated_files = glob.glob(f"{base_prefix}*")
-    if generated_files:
-        generated_files.sort(key=os.path.getmtime)
-        newest_file = generated_files[-1]
-        os.rename(newest_file, f"{params['fname']}.dat")
-        print(f"Renamed {newest_file} to {params['fname']}.dat")
-    # Fix energy and mass columns in the output file
-    fix_lund_file(f"{params['fname']}.dat")
+    generated_files = glob.glob(f"{base_prefix}*.dat")
+    combined_file = f"{params['fname']}.dat"
+    with open(combined_file, "w") as outfile:
+        for file in sorted(generated_files):
+            with open(file, "r") as infile:
+                outfile.write(infile.read())
+    for file in generated_files:
+        os.remove(file)
+    print(f"Combined {len(generated_files)} files into {combined_file}")
+    fix_lund_file(combined_file)
 
 def generate_vgg_events(params):
-    """Generate events using the VGG model via dvcsgen."""
+    """Generate VGG model events using dvcsgen"""
     mode = 3 if params['rad'] else 5
     if params.get('fringe'):
         mode += 1
@@ -165,25 +162,30 @@ def generate_vgg_events(params):
         cmd += ["--radgen", "--vv2cut", "0.6", "--delta", "0.1", "--radstable"]
     print("Executing VGG:", " ".join(cmd))
     subprocess.run(cmd, check=True)
+    
+    # Combine all output files into one
     base_prefix = params['fname'][:7]
-    generated_files = glob.glob(f"{base_prefix}*")
-    if generated_files:
-        generated_files.sort(key=os.path.getmtime)
-        newest_file = generated_files[-1]
-        os.rename(newest_file, f"{params['fname']}.dat")
-        print(f"Renamed {newest_file} to {params['fname']}.dat")
-    fix_lund_file(f"{params['fname']}.dat")
+    generated_files = glob.glob(f"{base_prefix}*.dat")
+    combined_file = f"{params['fname']}.dat"
+    with open(combined_file, "w") as outfile:
+        for file in sorted(generated_files):
+            with open(file, "r") as infile:
+                outfile.write(infile.read())
+    for file in generated_files:
+        os.remove(file)
+    print(f"Combined {len(generated_files)} files into {combined_file}")
+    fix_lund_file(combined_file)
 
 ##############################################################################
-# Main function and argument processing
+# Main function and argument parsing
 ##############################################################################
 def main(args):
-    """Main function to parse parameters and select the physics model."""
+    """Main function to handle event generation."""
     # Set environment variables
     os.environ["CLASDVCS_PDF"] = os.path.join(os.path.dirname(__file__), "dependencies", "dvcsgen")
     os.environ["PATH"] = f"{os.environ['CLASDVCS_PDF']}:{os.environ.get('PATH', '')}"
-
-    # Determine kinematic ranges: if a bin is selected, load from the appropriate CSV.
+    
+    # Parse kinematic parameters from bin file or arguments
     if args.bin:
         bin_file = "fringe_bin_scheme.csv" if args.fringe else "bin_scheme.csv"
         bin_scheme = np.loadtxt(os.path.join(os.path.dirname(__file__), bin_file), delimiter=',')
@@ -220,9 +222,11 @@ def main(args):
         'bh': generate_bh_events,
         'vgg': generate_vgg_events
     }
+    
     if args.model not in model_handlers:
         print(f"Unknown model: {args.model}")
         sys.exit(1)
+    
     model_handlers[args.model](params)
 
 if __name__ == '__main__':
