@@ -15,7 +15,6 @@ git clone https://github.com/tbhayward/dvcs_simulation.git
 cd dvcs_simulation
 chmod +x install.sh
 ./install.sh
-source ~/.bashrc
 ```
 
 ## Command-Line Options
