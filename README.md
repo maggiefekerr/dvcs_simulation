@@ -4,8 +4,10 @@
 
 A Python-based event generator for Deeply Virtual Compton Scattering (DVCS) simulations, supporting multiple models:
 
-- **KM15**
-- **VGG**
+- **KM15** Kumerički, Krešimir and Müller, Dieter, EPJ Web of Conferences
+112, 01012 (2016).
+- **VGG** M. Vanderhaeghen, P. A. Guichon, and M. Guidal, Phys.Rev. D60,
+094017 (1999), arXiv:hep-ph/9905372 [hep-ph].
 - **BH**: pure Bethe-Heitler process
 
 ## Installation
