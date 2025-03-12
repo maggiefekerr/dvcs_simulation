@@ -27,7 +27,7 @@ def mag_3vec(v):
 
 def boost_4vec(vec, boost):
     """
-    Boost 'vec' by the 3-velocity 'boost' in units of c.
+    Boost 'vec' by the 3-velocity 'boost' 
     Standard pure boost formula.
     """
     bx, by, bz = boost[0], boost[1], boost[2]
@@ -149,7 +149,7 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         protons   = data[data[:, 3] == 2212]
         photons   = data[data[:, 3] == 22]
     except IndexError:
-        print("Could not parse electrons, protons, or photons from columns.")
+        print("Could not parse electrons, protons or photons from columns.")
         return
 
     def calc_momentum(part):
@@ -179,7 +179,7 @@ def plot_kinematics(lund_file, beam_energy=10.604):
         print(f"Error calculating DIS kinematics: {e}")
         return
 
-    # Compute phiTrento for the final-state photon using 1:1 pairing with electrons
+    # Compute phiTrento for the final-state photon
     ne = len(electrons)
     nph = len(photons)
     nEvents = min(ne, nph)
@@ -216,7 +216,7 @@ def plot_kinematics(lund_file, beam_energy=10.604):
     plot_hist(axs[0,4], gamma_p, r'$\gamma_p$ (GeV)', (0, 10))
     plot_hist(axs[0,5], gamma_theta, r'$\gamma_\theta$ (deg)', (0, 90))
 
-    # Bottom row plots in desired order: y, Q2, W, xB, -t, phi (Trento)
+    # Bottom row plots 
     plot_hist(axs[1,0], y_val, r'$y$', (0, 1))
     plot_hist(axs[1,1], Q2, r'$Q^2$ (GeV$^2$)', (0, 12))
     plot_hist(axs[1,2], W, r'$W$ (GeV)', (1, 6))
@@ -224,15 +224,11 @@ def plot_kinematics(lund_file, beam_energy=10.604):
     plot_hist(axs[1,4], -t, r'$-t$ (GeV$^2$)', (0, 1))
     plot_hist(axs[1,5], phi_trento_vals, r'$\phi$ (deg)', (0, 360))
 
-    # Remove any overall figure title
-    # (No suptitle as requested)
-
     plt.subplots_adjust(wspace=0.3, hspace=0.4)
     outfile = lund_file.replace('.dat', '_plots.png')
     plt.savefig(outfile)
     plt.close()
     print(f"Successfully created: {outfile}")
-
 
 def main():
     parser = argparse.ArgumentParser(
