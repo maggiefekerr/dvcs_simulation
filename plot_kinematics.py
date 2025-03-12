@@ -7,33 +7,58 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 
 ##############################################################################
-# 1) Simple 4-vector utilities
+# 1) Constants and 4-vector utilities
 ##############################################################################
+M = 0.938272  # Proton mass in GeV
+
 def make_4vec(px, py, pz, E):
-    """Return a NumPy array [px, py, pz, E]."""
+    """
+    Return a NumPy array [px, py, pz, E].
+    """
     return np.array([px, py, pz, E], dtype=float)
+#endif
 
 def add_4vec(a, b):
-    """4-vector addition: a + b."""
+    """
+    4-vector addition: a + b.
+    a, b are [px, py, pz, E].
+    """
     return a + b
+#endif
 
 def sub_4vec(a, b):
-    """4-vector subtraction: a - b."""
+    """
+    4-vector subtraction: a - b.
+    a, b are [px, py, pz, E].
+    """
     return a - b
+#endif
 
 def mag_3vec(v):
-    """3-vector magnitude of the spatial part (v[0:3])."""
-    return np.sqrt(v[0]**2 + v[1]**2 + v[2]**2)
+    """
+    3-vector magnitude of the spatial part (v[0:3]).
+    """
+    return np.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
+#endif
+
+def minkowski_square_4vec(v):
+    """
+    Given v = [px, py, pz, E] in the (+, -, -, -) convention,
+    return v^2 = E^2 - (px^2 + py^2 + pz^2).
+    """
+    return v[3]*v[3] - (v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
+#endif
 
 def boost_4vec(vec, boost):
     """
-    Boost 'vec' by the 3-velocity 'boost'.
-    Standard pure boost formula.
+    Boost 'vec' by the 3-velocity 'boost' = [bx, by, bz].
+    Standard pure boost formula in the (+, -, -, -) metric.
     """
     bx, by, bz = boost[0], boost[1], boost[2]
     b2 = bx*bx + by*by + bz*bz
     if b2 < 1e-14:
         return vec.copy()
+    #endif
     gamma = 1.0 / math.sqrt(1.0 - b2)
     bp = bx*vec[0] + by*vec[1] + bz*vec[2]
     gamma2 = (gamma - 1.0)/b2
@@ -42,6 +67,7 @@ def boost_4vec(vec, boost):
     py = vec[1] + gamma2*bp*by - gamma*by*vec[3]
     pz = vec[2] + gamma2*bp*bz - gamma*bz*vec[3]
     return np.array([px, py, pz, Eprime], dtype=float)
+#endif
 
 def unit_3vec(v):
     """
@@ -51,7 +77,9 @@ def unit_3vec(v):
     m = mag_3vec(v)
     if m < 1e-14:
         return np.array([0.0, 0.0, 0.0])
+    #endif
     return v[:3] / m
+#endif
 
 ##############################################################################
 # 2) Compute phiTrento for the final-state photon
@@ -72,6 +100,8 @@ def compute_phi_trento_photon(e_4vec, ph_4vec, beam_4vec, target_4vec):
     denom = gN_4vec[3]
     if abs(denom) < 1e-14:
         return 0.0
+    #endif
+
     gN_boost = -gN_4vec[:3] / denom
     
     e_gN = boost_4vec(e_4vec, gN_boost)
@@ -86,12 +116,14 @@ def compute_phi_trento_photon(e_4vec, ph_4vec, beam_4vec, target_4vec):
     mag_vT = np.linalg.norm(vT)
     if mag_vT < 1e-14:
         return 0.0
+    #endif
     vT_unit = vT / mag_vT
     
     vTH = np.cross(q_unit, ph_unit)
     mag_vTH = np.linalg.norm(vTH)
     if mag_vTH < 1e-14:
         return 0.0
+    #endif
     vTH_unit = vTH / mag_vTH
     
     cosPhi = np.dot(vT_unit, vTH_unit)
@@ -101,11 +133,42 @@ def compute_phi_trento_photon(e_4vec, ph_4vec, beam_4vec, target_4vec):
     triple = np.dot(np.cross(e_unit, ph_unit), q_unit)
     if triple < 0.0:
         phi = 2.0 * math.pi - phi
+    #endif
         
     return math.degrees(phi)
+#endif
 
 ##############################################################################
-# 3) Main plot function (supports 1-3 input files with legend options)
+# 3) Function to compute -t from final-state protons
+##############################################################################
+def compute_minus_t(protons_array):
+    """
+    For each final-state proton row in the LUND data, compute -t,
+    where t = (p_target - p_proton)^2 in Minkowski space (with +, -, -, -).
+    
+    p_target = [0, 0, 0, M] (proton at rest)
+    p_proton = [px, py, pz, E]
+    
+    t = (p_target - p_proton)^2
+    We store -t for typical DVCS usage.
+    """
+    target_4 = make_4vec(0.0, 0.0, 0.0, M)
+    minus_t_values = []
+    for row in protons_array:
+        px = row[6]
+        py = row[7]
+        pz = row[8]
+        E  = row[9]
+        proton_4 = make_4vec(px, py, pz, E)
+        diff_4 = sub_4vec(target_4, proton_4)
+        t_val = minkowski_square_4vec(diff_4)  # (p_target - p_proton)^2
+        minus_t_values.append(-t_val)
+    #endfor
+    return np.array(minus_t_values)
+#endif
+
+##############################################################################
+# 4) Main plotting function (supports 1-3 input files with legend options)
 ##############################################################################
 def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
     """
@@ -121,7 +184,7 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
     
     Parameters:
       input_files: list of .dat filenames (1 to 3).
-      beam_energy: beam energy in GeV.
+      beam_energy: beam energy in GeV (default: 10.604).
       legend_labels: Optional list of legend labels (if not provided, defaults are used).
     """
     # Set style
@@ -136,16 +199,20 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
     rcParams['figure.autolayout'] = True
 
     # Define color mapping based on the number of datasets
-    color_map = {1: ['black'], 2: ['red', 'blue'], 3: ['red', 'blue', 'green']}
+    color_map = {1: ['black'],
+                 2: ['red', 'blue'],
+                 3: ['red', 'blue', 'green']}
     nfiles = len(input_files)
     if nfiles not in [1, 2, 3]:
         print("Error: Please provide 1 to 3 input files.")
         return
+    #endif
     colors = color_map[nfiles]
     
     # Use default legend labels if not provided
     if legend_labels is None or len(legend_labels) != nfiles:
         legend_labels = [f"Dataset {i+1}" for i in range(nfiles)]
+    #endif
     
     # Initialize lists for data from each file
     all_data = []
@@ -155,7 +222,13 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
     for fname in input_files:
         try:
             with open(fname, 'r') as f:
-                particle_lines = [line for line in f if len(line.strip().split()) == 14]
+                particle_lines = []
+                for line in f:
+                    cols = line.strip().split()
+                    if len(cols) == 14:
+                        particle_lines.append(line)
+                    #endif
+                #endfor
             data = np.loadtxt(particle_lines)
             all_data.append(data)
             all_electrons.append(data[data[:, 3] == 11])
@@ -164,6 +237,7 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
         except Exception as e:
             print(f"Error processing file {fname}: {e}")
             return
+    #endfor
 
     # Compute phiTrento for each dataset
     phi_trento_all = []
@@ -172,13 +246,15 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
         photons = all_photons[i]
         nEvents = min(len(electrons), len(photons))
         beam_4 = make_4vec(0.0, 0.0, beam_energy, beam_energy)
-        target_4 = make_4vec(0.0, 0.0, 0.0, 0.938272)
+        target_4 = make_4vec(0.0, 0.0, 0.0, M)
         phi_vals = []
         for j in range(nEvents):
             e_4 = make_4vec(electrons[j][6], electrons[j][7], electrons[j][8], electrons[j][9])
             ph_4 = make_4vec(photons[j][6], photons[j][7], photons[j][8], photons[j][9])
             phi_vals.append(compute_phi_trento_photon(e_4, ph_4, beam_4, target_4))
+        #endfor
         phi_trento_all.append(np.array(phi_vals))
+    #endfor
 
     # For each dataset, compute kinematic quantities
     e_p_all = []
@@ -196,9 +272,12 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
     for data in all_data:
         def calc_momentum(part):
             return np.sqrt(part[:, 6]**2 + part[:, 7]**2 + part[:, 8]**2)
+        #endif
+
         def calc_theta(part):
             p = calc_momentum(part)
             return np.degrees(np.arccos(part[:, 8] / p))
+        #endif
         
         electrons = data[data[:, 3] == 11]
         protons   = data[data[:, 3] == 2212]
@@ -211,20 +290,24 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
         gamma_p_all.append(calc_momentum(photons))
         gamma_theta_all.append(calc_theta(photons))
         
-        # DIS kinematics (using electron energy from col 10)
+        # DIS kinematics (using electron energy from col 10 => e[9])
         nu = beam_energy - electrons[:, 9]
-        Q2_val = 4.0 * beam_energy * electrons[:, 9] * np.sin(np.radians(calc_theta(electrons))/2.0)**2
+        e_theta_deg = calc_theta(electrons)  # in degrees
+        Q2_val = 4.0 * beam_energy * electrons[:, 9] * np.sin(np.radians(e_theta_deg)/2.0)**2
         y_val = nu / beam_energy
-        xB_val = Q2_val / (2.0 * 0.938272 * nu)
-        W_val = np.sqrt(0.938272**2 + 2.0 * 0.938272 * nu - Q2_val)
-        t_val = -(protons[:,6]**2 + protons[:,7]**2 + (protons[:,8] - 0.938272)**2)
-
+        xB_val = Q2_val / (2.0 * M * nu)
+        W_val = np.sqrt(M**2 + 2.0*M*nu - Q2_val)
+        
+        # Now compute -t
+        minus_t_vals = compute_minus_t(protons)
+        
         y_all.append(y_val)
         Q2_all.append(Q2_val)
         W_all.append(W_val)
         xB_all.append(xB_val)
-        t_all.append(t_val)
-    
+        t_all.append(minus_t_vals)
+    #endfor
+
     # Create figure with 2 rows x 6 columns
     fig, axs = plt.subplots(2, 6, figsize=(28, 10))
     
@@ -232,13 +315,16 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
         for d, col, label in zip(data_list, colors, legend_labels):
             counts, bin_edges = np.histogram(d, bins=bins, range=x_range)
             centers = 0.5 * (bin_edges[1:] + bin_edges[:-1])
-            ax.errorbar(centers, counts, yerr=np.sqrt(counts), fmt='o',
+            errs = np.sqrt(counts)
+            ax.errorbar(centers, counts, yerr=errs, fmt='o',
                         ms=4, lw=1, capsize=2, color=col, label=label)
+        #endfor
         ax.set_xlabel(xlabel)
         ax.set_ylabel('Counts')
         ax.set_xlim(x_range)
         ax.grid(alpha=0.3)
         ax.legend(loc='upper right')
+    #endif
     
     # Top row plots: e_p, e_theta, p_p, p_theta, gamma_p, gamma_theta
     plot_multiple(axs[0,0], e_p_all, r'$e_p$ (GeV)', (0, 12))
@@ -257,31 +343,39 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
     plot_multiple(axs[1,5], phi_trento_all, r'$\phi$ (deg)', (0, 360))
     
     plt.subplots_adjust(wspace=0.3, hspace=0.4)
+    
     outfile = input_files[0].replace('.dat', '_plots.png')
     plt.savefig(outfile)
     plt.close()
     print(f"Successfully created: {outfile}")
+#endif
 
 ##############################################################################
-# Main function and argument parsing
+# 5) Main function and argument parsing
 ##############################################################################
 def main():
     parser = argparse.ArgumentParser(
         description='Plot kinematics from up to three LUND .dat files with legend options',
         add_help=False
     )
-    parser.add_argument('input_files', nargs='+', help='Input .dat file(s) (up to 3)')
+    parser.add_argument('input_files', nargs='+',
+                        help='Input .dat file(s) (up to 3)')
     parser.add_argument('-b', '--beam-energy', type=float, default=10.604,
                         help='Beam energy in GeV (default: 10.604)')
     parser.add_argument('-l', '--labels', nargs='+',
                         help='Legend labels for each dataset (up to 3)')
+    
     if len(sys.argv) == 1:
         print("Usage: python plot_kinematics.py FILE1.dat [FILE2.dat FILE3.dat] [OPTIONS]")
         print("  -b, --beam-energy <float>  (default=10.604)")
         print("  -l, --labels <label1> [label2 label3]")
         return
+    #endif
+
     args = parser.parse_args()
     plot_kinematics(args.input_files, args.beam_energy, args.labels)
+#endif
 
 if __name__ == '__main__':
     main()
+#endif
