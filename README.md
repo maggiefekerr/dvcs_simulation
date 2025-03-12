@@ -34,13 +34,13 @@ chmod +x install.sh
 |------------|--------------------------|---------|------------|
 | `--xBmin`  | Minimum $x_B$            | 0.05    | 0.001–0.99 |
 | `--xBmax`  | Maximum $x_B$            | 0.75    | 0.001–0.99 |
-| `--Q2min`  | Minimum $Q^2$ [GeV²]     | 0.9     | 0.1–15     |
-| `--Q2max`  | Maximum $Q^2$ [GeV²]     | 11.0    | 0.1–15     |
-| `--tmin`   | Minimum $t$ [GeV²]       | 0.085   | 0.01–2.0   |
-| `--tmax`   | Maximum $t$ [GeV²]       | 1.79    | 0.01–2.0   |
+| `--Q2min`  | Minimum $Q^2$ (GeV²)     | 0.9     | 0.1–15     |
+| `--Q2max`  | Maximum $Q^2$ (GeV²)     | 11.0    | 0.1–15     |
+| `--tmin`   | Minimum $t$ (GeV²)       | 0.085   | 0.01–2.0   |
+| `--tmax`   | Maximum $t$ (GeV²)       | 1.79    | 0.01–2.0   |
 | `--ymin`   | Minimum $y$ 		        | 0.19	  | 0-1        |
 | `--ymax`   | Maximum $y$ 	            | 0.85    | 0-1        |
-| `--w2min`  | Minimum $W^2$ [GeV²]     | 3.61    |  		   |
+| `--w2min`  | Minimum $W^2$ (GeV²)     | 3.61    |  		   |
 
 
 ### Advanced Options
