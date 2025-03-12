@@ -217,7 +217,7 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
         y_val = nu / beam_energy
         xB_val = Q2_val / (2.0 * 0.938272 * nu)
         W_val = np.sqrt(0.938272**2 + 2.0 * 0.938272 * nu - Q2_val)
-        t_val = -(protons[:, 6]**2 + protons[:, 7]**2 + (protons[:, 8] - 0.938272)**2)
+        t_val = (0.938272 - protons[:, 9])**2 - (protons[:, 6]**2 + protons[:, 7]**2 + protons[:, 8]**2)
         
         y_all.append(y_val)
         Q2_all.append(Q2_val)
