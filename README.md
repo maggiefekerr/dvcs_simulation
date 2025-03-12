@@ -13,6 +13,8 @@ M. Vanderhaeghen, P. A. Guichon, and M. Guidal, Phys.Rev. D60,
 - **BH**: 
 pure Bethe-Heitler process
 
+Much of the initial set up for this repository comes from Sangbaek Lee (https://gitlab.com/sangbaek/km15gen).
+
 ## Installation
 
 ```bash
