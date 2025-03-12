@@ -16,7 +16,7 @@ from km15gen import genOneEvent
 M = 0.938272081  # Proton mass in GeV/c²
 
 ##############################################################################
-# Post-processing: Fix LUND file energy and mass columns
+# Post-processing: Fix LUND file energy and mass columns 
 ##############################################################################
 def fix_lund_file(filename):
     """
@@ -72,7 +72,7 @@ def generate_km15_events(params):
     """Generate events using KM15 model"""
     start_time = time.time()
     output = []
-    while len(output) < params['netries']:
+    while len(output) < params['nentries']:
         result = genOneEvent(
             params['xBmin'], params['xBmax'],
             params['Q2min'], params['Q2max'],
@@ -96,7 +96,7 @@ def generate_bh_events(params):
     dvcsgen_path = os.path.join(os.path.dirname(__file__), "dependencies", "dvcsgen", "dvcsgen")
     cmd = [
         dvcsgen_path,
-        "--trig", str(params['netries']),
+        "--trig", str(params['nentries']),
         "--beam", f"{params['beam']:.3f}",
         "--x", f"{params['xBmin']:.3f}", f"{params['xBmax']:.3f}",
         "--q2", f"{params['Q2min']:.3f}", f"{params['Q2max']:.3f}",
@@ -140,7 +140,7 @@ def generate_vgg_events(params):
     dvcsgen_path = os.path.join(os.path.dirname(__file__), "dependencies", "dvcsgen", "dvcsgen")
     cmd = [
         dvcsgen_path,
-        "--trig", str(params['netries']),
+        "--trig", str(params['nentries']),
         "--beam", f"{params['beam']:.3f}",
         "--x", f"{params['xBmin']:.3f}", f"{params['xBmax']:.3f}",
         "--q2", f"{params['Q2min']:.3f}", f"{params['Q2max']:.3f}",
@@ -210,7 +210,7 @@ def main(args):
         'ymax': args.ymax,
         'w2min': args.w2min,
         'rad': int(args.radgen),
-        'netries': args.netries,
+        'nentries': args.nentries,
         'fname': args.fname,
         'seed': args.seed,
         'bin': args.bin,
@@ -239,7 +239,7 @@ if __name__ == '__main__':
                         help="Beam energy in GeV")
     parser.add_argument("-model", "--model", choices=['km15','bh','vgg'], default='km15',
                         help="Physics model to use")
-    parser.add_argument("-netries", "--netries", type=int, default=1,
+    parser.add_argument("-nentries", "--nentries", type=int, default=1,
                         help="Number of entries to generate")
     parser.add_argument("-fname", "--fname", default="output",
                         help="Base filename for output")

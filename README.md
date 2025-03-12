@@ -19,7 +19,7 @@ chmod +x install.sh
 
 ## Command-Line Options
 
-### Core (Required) Parameters
+### Core Parameters
 
 | Option    	| Description                           | Default  |
 |---------------|---------------------------------------|----------|
@@ -38,20 +38,18 @@ chmod +x install.sh
 | `--Q2max`  | Maximum $Q^2$ [GeV²]     | 11.0    | 0.1–15     |
 | `--tmin`   | Minimum $t$ [GeV²]       | 0.085   | 0.01–2.0   |
 | `--tmax`   | Maximum $t$ [GeV²]       | 1.79    | 0.01–2.0   |
+| `--ymin`   | Minimum $y$ 		        | 0.19	  | 0-1        |
+| `--ymax`   | Maximum $y$ 	            | 0.85    | 0-1        |
+| `--w2min`  | Minimum $W^2$ [GeV²]     | 3.61    |  		   |
 
-### Additional Cuts
-
-| Option      | Description            | Default |
-|-------------|------------------------|---------|
-| `--ymin`    | Minimum $y$           | 0.19    |
-| `--ymax`    | Maximum $y$           | 0.85    |
-| `--w2min`   | Minimum $W^2$ [GeV²]  | 3.61    |
 
 ### Advanced Options
 
 | Option      | Description                                  |
 |-------------|----------------------------------------------|
-| `--seed`    | Set predefined seed (0 = automatic)              |
+| `--seed`    | Set predefined seed (0 = automatic)          |
+
+... Several additional advanced options if you are willing to bravely venture deep into the dvcsgen installation.
 
 ## Usage Examples
 
@@ -98,7 +96,7 @@ python main.py --model bh --trig 1000 --fname bh_test
 pip3 install --user cython
 ```
 **Q:** `dvcsgen` not found?  
-**A:** Run `source ~/.bashrc` after installation and verify that the `CLASDVCS_PDF` environment variable is set.
+**A:** Run `source ~/.bashrc` after installation and/or verify that the `CLASDVCS_PDF` environment variable is set.
 
 
 
