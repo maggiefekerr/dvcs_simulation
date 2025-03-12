@@ -56,19 +56,25 @@ chmod +x install.sh
 ### Basic KM15 Generation
 
 ```bash
-python main.py --model km15 --trig 1000 --fname km15_test
+python main.py --model km15 --nentries 1000 --fname km15_test
 ```
 
 ### Basic VGG Generation
 
 ```bash
-python main.py --model vgg --trig 1000 --fname vgg_test
+python main.py --model vgg --nentries 1000 --fname vgg_test
 ```
 
 ### Basic BH Generation
 
 ```bash
-python main.py --model bh --trig 1000 --fname bh_test
+python main.py --model bh --nentries 1000 --fname bh_test
+```
+
+### Limited KM15 kinematic range and non-default beam energy
+
+```bash
+python main.py --model km15 --nentries 1000 --fname km15_test --Q2min 2 --Q2max 3 --beam 6.5
 ```
 
 ## Output Files

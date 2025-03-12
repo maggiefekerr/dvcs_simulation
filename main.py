@@ -268,7 +268,7 @@ if __name__ == '__main__':
                         help="Maximum y value")
     parser.add_argument("-w2min", "--w2min", type=float, default=3.61,
                         help="Minimum W² [GeV²]")
-    # Special options
+    # Special options (radgen not really tested yet)
     parser.add_argument("-radgen", "--radgen", action='store_true',
                         help="Enable radiative effects")
     parser.add_argument("-seed", "--seed", type=int, default=0,
