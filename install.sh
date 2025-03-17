@@ -21,4 +21,4 @@ cd ../..
 echo "export PYTHONPATH=\$PYTHONPATH:$(pwd)" >> ~/.bashrc
 
 echo "Installation complete! Test with:"
-echo "python3 main.py --model km15 --nentries 10 --fname test"
+echo "python main.py --model km15 --nentries 10 --fname test"

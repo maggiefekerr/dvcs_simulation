@@ -344,7 +344,7 @@ def plot_kinematics(input_files, beam_energy=10.604, legend_labels=None):
     
     plt.subplots_adjust(wspace=0.3, hspace=0.4)
     
-    outfile = input_files[0].replace('.dat', '_plots.png')
+    outfile = input_files[0].replace('.dat', '_plots.pdf')
     plt.savefig(outfile)
     plt.close()
     print(f"Successfully created: {outfile}")
