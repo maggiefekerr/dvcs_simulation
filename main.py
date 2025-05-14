@@ -257,9 +257,9 @@ if __name__ == '__main__':
                         help="Minimum Q² [GeV²] when not using bins")
     parser.add_argument("-Q2max", "--Q2max", type=float, default=11.0,
                         help="Maximum Q² [GeV²] when not using bins")
-    parser.add_argument("-tmin", "--tmin", type=float, default=0.085,
+    parser.add_argument("-tmin", "--tmin", type=float, default=0.000,
                         help="Minimum |t| [GeV²] when not using bins")
-    parser.add_argument("-tmax", "--tmax", type=float, default=1.79,
+    parser.add_argument("-tmax", "--tmax", type=float, default=1.00,
                         help="Maximum |t| [GeV²] when not using bins")
     # Additional cuts
     parser.add_argument("-ymin", "--ymin", type=float, default=0.19,
