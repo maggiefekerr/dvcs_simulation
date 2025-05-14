@@ -12,45 +12,52 @@ C*****************************************************************
 C..  Number of events 
       INTEGER       I,NEVENT
 c
-      call CL_OPTIONS                     ! command line processing
-#ifdef  hbook
-      if(ntOK) call INIT_PAW()            ! init hbook if requested
-#endif
+      call CL_OPTIONS          ! command line processing
+      call INIT_PAW            ! init hbook
 c
 C..   number of events   
 c
        NEVENT=cl_triggers
+
+
+C.. Constats and Parameter
+C.. Initialization of the lepto program 
 c
-       CALL DVCSINIT       ! init limits/cuts for dvcs/pi0
+       CALL  CLASBOSINIT('MCEVENT')
 c
-       if(cl_verblev.gt.0) WRITE(*,*) 'NEVENT=',NEVENT
-c
+      CALL DVCSINIT
+      if(cl_verblev.gt.0) WRITE(*,*) 'NEVENT=',NEVENT
+
 C.. Event generation: 
-c
-        DO I = 1,NEVENT
-c
+       DO I = 1,NEVENT
+          print *,'Event nb: ',I
+       
+C.. Output of the number of generated events 
+         IF (MOD(I,cl_nprint).EQ.0.and.cl_verblev.gt.0)
+     6   WRITE(*,*) I,'  from ',NEVENT
+C..
+C..
+c         print *,'juste avant cleannt'
          CALL CLEANNT
          CALL genEVENT(I)       
-         CALL CLASFILL(I)    ! process event
-c
-         IF (MOD(I,cl_nprint).EQ.0.and.cl_verblev.gt.0)
-     6   WRITE(*,*) I,'  from ',NEVENT,cl_nprint,cl_be
-c
-        ENDDO
-c
+C..
+C..      fill in BOS and ntuples
+C.. 
+        CALL CLASBOSFILL(I)
+C..
+       ENDDO
+
          if (datfileOK) close(41)
-#ifdef  hbook
          if(ntOK) call CLOSE_PAW()
-#endif
-c
+
+       CALL CLASBOSEND('MCEVENT')
        WRITE(*,*) 'Total ',NEVENT,' in pb ',smax
 C.. Saving the last random number configuration 
        END      
 c
 c
 c
-#ifdef  hbook
-       SUBROUTINE INIT_PAW()
+       SUBROUTINE INIT_PAW
        implicit none
        integer h,nwpawc
        parameter (nwpawc=1000000)
@@ -62,7 +69,7 @@ c
        call hini(NTID_OUT)
        return
        end
-c
+c 
          subroutine  CLOSE_PAW()
          implicit none
          integer icycle
@@ -84,11 +91,9 @@ c
       integer lrec,istat
       character*14 hbooknm
       if (cl_pi0) then
-       write(hbooknm,'(A,A,A)') 'p',bosout,'.hbook'
-      else if (cl_eta) then
-       write(hbooknm,'(A,A,A)') 'e',bosout,'.hbook'
+       hbooknm='exclpi0.hbook'
       else
-       write(hbooknm,'(A,A,A)') 'd',bosout,'.hbook'
+       hbooknm='dvcsgen.hbook'
       endif
       lrec=8191
 c     open koko
@@ -117,10 +122,10 @@ c234567890123456789012345678901234567890123456789012345678901234567890123456
       if (cl_mom) then    
         if(cl_pol.eq.1) then
        call HBNAME(NTID_OUT,'mom0',gproh,
-     +'gproh:I,ghp1:R,ghp2:R,ghccb:R,ghcci:R,gh0bh:R,gh1bh:R,gh2bh:R,'//
+     +'gproh:I,gh0bh:R,gh1bh:R,gh2bh:R,'//
      +'gh0dvcs:R,gh1dvcs:R,ghs1dvcs:R,'//
      +'gh0iunp:R,gh1iunp:R,ghs1iunp:R,ghs2iunp:R,'//
-     +'gh0bhlp:R,gh1bhlp:R,ghs1ilp:R,gh1ilp:R,gh0ilp:R')
+     +'gh0bhlp:R,gh1bhlp:R,ghs1ilp:R,gh1ilp:R')
 c
        else if(cl_pol.eq.2) then
        call HBNAME(NTID_OUT,'mom0',gproh,
@@ -138,23 +143,22 @@ c
      +'gh0iunp:R,gh1iunp:R,ghs1iunp:R,ghs2iunp:R')
        endif
       endif
-c
+
       if (cl_radgen) then    
        call HBNAME(NTID_OUT,'radgen',iproctype,
-     +'iproctype:I,radxb:R,radxb_true:R,radq2:R,radq2_true:R,radphi:R,radt:R,radnu:R,bornweight:R,radweight:R,'//
+     +'iproctype:I,radq2:R,radnu:R,radweight:R,'//
      +'grade:R,gradt:R,gradf:R')
       endif
       end
 c
-#endif
 c
        SUBROUTINE CL_OPTIONS
        implicit none
 #include "dvcs.inc"
-       integer i,iran,irannom,ivalnum
-       real VEC1,valnum,rndnmbr
+       integer i,iran,irannom
+       real VEC1,valnum
        character*20 cnumber
-       integer  numopts,IARGC
+       integer  numopts,NCDECI
        integer*4 now(3)
 c
 c    command line processing
@@ -164,31 +168,24 @@ c
       cl_dvcs=.TRUE.         ! default dvcs on
       cl_pi0 =.FALSE.        ! default no pi0
       cl_eta =.FALSE.        ! default no etta
-      cl_bh=3                ! full x-section 1-only BH
-      cl_gpd=3               ! gpd model
-      cl_scale=1.0           ! gpd model
-      cl_bpi0=1.3            ! b=1.7
-      cl_ycol=0.005          ! default min for P1
-      cl_xpos=0              ! x-position
-      cl_ypos=0              ! y-position
+      cl_gpd=4               ! gpd model
+      cl_ycol=0.05           ! default ycol-y >0.05 def
       cl_zpos=0              ! z-position
-      cl_rast=0.0           ! raster diameter in cm
-      cl_zwidth=0            ! z-width ( zpos+/-zwidth)
+      cl_zwidth=1.25         ! z-width ( zpos+/-zwidth)
       cl_pol=0               ! unpolarized target
-      cl_beam_energy=10.6    ! def clas12
-      cl_wmin=4.0            ! def w2min
-      cl_ymin=0.05           ! def ymin -> Emax=(1-ymin)*E
-      cl_ymax=0.9            ! def ymax
-      cl_thmin=0.09           ! def e'tmin
-      cl_thmax=1.57            ! def e'tmax
-      cl_tmax=1.0             ! def tmax
+      cl_beam_energy=5.75    ! def e1_dvcs
+      cl_bh=0.0              ! def BH const C dN/Dk=1/(k+C)
+      cl_wmin=1.85           ! def w2min
+      cl_ymin=0.2            ! def ymin -> Emax=(1-ymin)*E
+      cl_ymax=0.94           ! def ymax
+      cl_thmin=0.0            ! def e'tmin
+      cl_tmax=6.0             ! def tmax
       cl_tmin=0.0             ! def tmin
-      cl_q2max=15.0            ! def Q2 max
-      cl_q2min=1.0            ! def Q2 min
-      cl_xmax=0.75             ! def Q2 max
-      cl_xmin=0.05             ! def Q2 min
-      cl_delta=1d-2             ! def delta (minimum rad photon energy)
-      cl_vv2cut=0.1     ! def vv2cut (minimum missing mass_ep squared)
+      cl_q2max=6.0            ! def Q2 max
+      cl_q2min=0.8            ! def Q2 min
+      cl_xmax=0.95             ! def x max
+      cl_xmin=0.             ! def x min
+      cl_thmax=1.57            ! def e'tmax
       cl_target='proton'     ! (def proton target)
 c
       cl_proloss=0            ! no proton loss by default
@@ -201,28 +198,21 @@ c
       cl_smf=0.003         ! F
       cl_smg=0.015         ! G
 c
-      cl_seed=0
-      cl_verblev=0
-      cl_writef=0            ! 0-clas12 1-gsim lund format
+      cl_verblev=1
+      cl_writef=1            ! gsim lund format
       cl_nprint=1000         ! print every cl_nprint event
-      cl_triggers = 10000  
-      cl_nmax = 2000         ! max number of events in the file
-      cl_printgpd=.FALSE.
+      cl_triggers = 10  
+      bosout='dvcsgen.evt'
       cl_mom=.FALSE.
-      cl_ktcor=.FALSE.
-      cl_global=.FALSE.
       cl_radgen=.FALSE.
-      cl_radext=.FALSE.
-      cl_radstable=.FALSE.
-      cl_mod=0              ! write all, otherwise filter
+      bosOK=.TRUE.
+      bossmearOK=.FALSE.
       datfileOK=.TRUE.      ! write a data file
       weightOK=.FALSE.
       acce16=.FALSE.
       acceg1=.FALSE.
       acc12=.FALSE.
       ntOK=.TRUE.
-      cl_docker=.FALSE.
-      bosout='dvcsgen'
       numopts  = IARGC()
 c      
       if(numopts.gt.0 ) then
@@ -235,37 +225,25 @@ c
         if(cnumber.eq.'--trig'.and.i.lt.numopts) then
           i=i+1
           CALL GETARG(i,cnumber)
-          cl_triggers=valnum(cnumber)
-        elseif(cnumber.eq.'--nmax'.and.i.lt.numopts) then
-          i=i+1
-          CALL GETARG(i,cnumber)
-          cl_nmax=valnum(cnumber)
+          cl_triggers=NCDECI(cnumber)
         elseif(cnumber.eq.'--v'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
-           cl_verblev=valnum(cnumber)
+           cl_verblev=NCDECI(cnumber)
         elseif(cnumber.eq.'--writef'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
-           cl_writef=valnum(cnumber)
-        elseif(cnumber.eq.'--mod'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_mod=valnum(cnumber)
+           cl_writef=NCDECI(cnumber)
         elseif(cnumber.eq.'--print'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
-           cl_nprint=valnum(cnumber)
+           cl_nprint=NCDECI(cnumber)
         elseif(cnumber.eq.'--lpol') then
            cl_pol=1
         elseif(cnumber.eq.'--tpol') then
            cl_pol=2
         elseif(cnumber.eq.'--radgen') then
            cl_radgen=.TRUE.
-        elseif(cnumber.eq.'--radext') then
-           cl_radext=.TRUE.
-        elseif(cnumber.eq.'--radstable') then
-           cl_radstable=.TRUE.
         elseif(cnumber.eq.'--mom') then
            cl_mom=.TRUE.
         elseif(cnumber.eq.'--pi0') then
@@ -274,10 +252,6 @@ c
            cl_eta=.TRUE.
         elseif(cnumber.eq.'--nodvcs') then
            cl_dvcs=.FALSE.
-        elseif(cnumber.eq.'--ktcor') then
-           cl_ktcor=.TRUE.
-        elseif(cnumber.eq.'--globalfit') then
-           cl_global=.TRUE.
         elseif(cnumber.eq.'--beam'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
@@ -286,10 +260,6 @@ c
            i=i+1
            CALL GETARG(i,cnumber)
            cl_bh=valnum(cnumber)           
-        elseif(cnumber.eq.'--scale'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_scale=valnum(cnumber)           
         elseif(cnumber.eq.'--t'.and.i.lt.numopts+1) then
            i=i+1
            CALL GETARG(i,cnumber)
@@ -300,10 +270,10 @@ c
         elseif(cnumber.eq.'--th'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
-           cl_thmin=valnum(cnumber)
+           cl_thmin=NCDECI(cnumber)*0.001
            i=i+1
            CALL GETARG(i,cnumber)
-           cl_thmax=valnum(cnumber)
+           cl_thmax=NCDECI(cnumber)*0.001
         elseif(cnumber.eq.'--q2'.and.i.lt.numopts+1) then
            i=i+1
            CALL GETARG(i,cnumber)
@@ -329,18 +299,10 @@ c
            i=i+1
            CALL GETARG(i,cnumber)
            cl_ymax=valnum(cnumber)
-        elseif(cnumber.eq.'--xpos'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_xpos=valnum(cnumber)
-        elseif(cnumber.eq.'--ypos'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_ypos=valnum(cnumber)
         elseif(cnumber.eq.'--zpos'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
-           cl_zpos=valnum(cnumber)
+           cl_zpos=NCDECI(cnumber)*0.1           
         elseif(cnumber.eq.'--ycol'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
@@ -348,33 +310,22 @@ c
         elseif(cnumber.eq.'--gpd'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
-           cl_gpd=valnum(cnumber)
+           cl_gpd=NCDECI(cnumber)           
         elseif(cnumber.eq.'--zwidth'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
-           cl_zwidth=valnum(cnumber)
-         elseif(cnumber.eq.'--raster'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_rast=valnum(cnumber)           
-        elseif(cnumber.eq.'--file'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,bosout)
-        elseif(cnumber.eq.'--delta'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_delta=valnum(cnumber)           
-        elseif(cnumber.eq.'--vv2cut'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_vv2cut=valnum(cnumber)           
+           cl_zwidth=NCDECI(cnumber)*0.1           
         elseif(cnumber.eq.'--targ'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cl_target)
+        elseif(cnumber.eq.'--bos') then
+           bosOK=.TRUE.
+        elseif(cnumber.eq.'--bossmear') then
+           bossmearOK=.TRUE.
+        elseif(cnumber.eq.'--weight') then
+           weightOK=.TRUE.
         elseif(cnumber.eq.'--nodat') then
            datfileOK=.FALSE.
-        elseif(cnumber.eq.'--printgpd') then
-           cl_printgpd=.TRUE.
         elseif(cnumber.eq.'--acce16') then
            acce16=.TRUE.
         elseif(cnumber.eq.'--acc12') then
@@ -383,14 +334,21 @@ c
            acceg1=.TRUE.
         elseif(cnumber.eq.'--weight') then
            weightOK=.TRUE.
-        elseif(cnumber.eq.'--docker') then
-           cl_docker=.TRUE.
         elseif(cnumber.eq.'--nont') then
            ntOK=.FALSE.
-        elseif(cnumber.eq.'--seed'.and.i.lt.numopts) then
+        elseif(cnumber.eq.'--rndm'.and.i.lt.numopts) then
+           i=i+1
+           CALL GETARG(i,cnumber)
+           irannom=valnum(cnumber)
+           call RLUXGO(4,irannom,0,0)
+c        call itime(now)     ! now(1)=hour, (2)=minute, (3)=second
+c           irannom=10000*now(3)+100*now(2)+now(1)
+c        print *,'Random number for this set->',irannom,now(1),now(2),now(3)
+c           DO 100 iran=1,irannom
+c 100       CALL RANMAR(VEC1,1)
+        elseif(cnumber.eq.'--file'.and.i.lt.numopts) then
           i=i+1
-          CALL GETARG(i,cnumber)
-          cl_seed=ivalnum(cnumber)
+          CALL GETARG(i,bosout)
         elseif(cnumber.eq.'--proloss') then
           cl_proloss=1
         elseif(cnumber.eq.'--smear') then
@@ -427,166 +385,58 @@ c
           call printusage
           stop
         endif
+
         if(i.lt. numopts) goto 1
  2      continue
         call printvalues
-c
-c randomize
-c
-        call RNDMSEED()
         return 
         end
-c
-        subroutine printgpd
-        IMPLICIT NONE
-#include "dvcs.inc"
-#include "dvcsmom.inc"
-        integer nx,nq,nt,nfe,nfg
-        real  xmax,xmin,q2max,q2min,tmax,tmin 
-        common /xmax/  xmax,xmin,q2max,q2min,tmax,tmin 
-     6                 ,nx,nq,nt,nfe,nfg
-      double precision xbd,Q2d,del2d,phield,phigd,dstot,stotint,yb,w2
-      double precision nu,W,qmod,E1cm,P1cm,E2cm,P2cm,del2max,del2minc
-c
-      real  h1uimag,h1dimag,h1tuimag,h1tdimag
-      common /h1imag/h1uimag,h1dimag,h1tuimag,h1tdimag
-      double precision xb, ybc, Q2, del2, del2min,phip,phipel,P1,P2,Kfac,Jfac,ds
-      common/todvcs/ xb, ybc, Q2, del2, del2minc,phip,phipel,P1,P2,Kfac,Jfac,ds
-c
-c
-        real dx,dq,dt,cpi,alu,rP1,rP2
-        integer ix,iq,it
-        logical outoflimits
-      double precision F1pn,F2pn
-      common/formfac/ F1pn(2), F2pn(2)
-      double precision skew,H1_RE, H1_IM, H1T_RE, H1T_IM,
-     &             E1_RE, E1_IM, E1T_RE, E1T_IM , C_I_im
-c
-        print *, '            x         Q2        t      A_LU      F1        F2       H1-IM
-     6      H1-RE     H1T-IM     E1-IM    E1T-IM, H1-RE,    H1T-RE     E1-RE    E1T-RE h1uim h1dim h1tuim h1tdim c_I_im'
-        cpi=-3.1415926
-        dx=0.05
-        dq=0.5
-        dt=0.1
-        nx=(xmax-xmin)/dx+1
-        nq=(q2max-q2min)/dq+1
-        nt=(tmax-tmin)/dt+1
-c
-         DO ix=1,nx
-         xbd=xmin+(ix-1)*dx
-          DO iq=1,nq
-          Q2d=q2min+(iq-1)*dq
-           yb=Q2d/(2D0*Mp*xbd*cl_be)
-           w2=Mp*Mp+2.0*Mp*cl_be*yb-Q2d
-           nu  = Q2d/(2D0*Mp*xbd)
-           W   = sqrt(W2)
-           qmod = sqrt(nu**2 + Q2d)
-c           print *,'xbd,Q2d',xbd,Q2d,outoflimits(xbd,Q2d),nx,nq,nt,tmin,tmax
-         if( .not.outoflimits(xbd,Q2d) ) then
-c
-             DO it=1,nt
-              del2d=tmax-(it-1)*dt
-              CALL bhdvcs(xbd, Q2d, del2d, 2.2689D0, 2.2689D0,rP1,rP2)
-c
-              E1cm = Mp*(Mp + nu)/W
-              P1cm = Mp*qmod/W
-              E2cm = (W2 + Mp**2)/(2D0*W)
-              P2cm = (W2 - Mp**2)/(2D0*W)
-              del2max = 2D0*(Mp**2 - E1cm*E2cm - P1cm*P2cm)
-              del2min = 2D0*(Mp**2 - E1cm*E2cm + P1cm*P2cm)
-c            asymmetries at 90-degree
-             alu=hs1Iunp/(hc0BH+hc0dvcs+hc0Iunp)
-c           print *,'xbd,Q2d,del2',xbd,Q2d,del2d,del2min,del2max
-      if( del2d.le.del2min .and. del2d.ge.del2max ) then  ! in limits
-      if (cl_global) then
-      call nuclFF_YAHL( del2d )
-      else
-      call nuclFF( del2d )
-      endif
-      skew = xbd/(2D0 - xbd)
-      IF(IGPD.lt.100) then
-      call amptab(skew, del2d, 
-     &             H1_RE, H1_IM, H1T_RE, H1T_IM,
-     &             E1_RE, E1_IM, E1T_RE, E1T_IM )
-      ELSE
-      call amptabgag(skew, del2d, 
-     &             H1_RE, H1_IM, H1T_RE, H1T_IM,
-     &             E1_RE, E1_IM, E1T_RE, E1T_IM )
-      endif
-      C_I_im = F1pn(1)*H1_IM + xbd/(2D0-xbd)*(F1pn(1)+F2pn(1))*H1T_IM 
-c     &- del2/Mp**2/4D0*F2pn(1)*E1_IM
-c
-c
-        write(6,'(A,18F10.3)') 'BM-GPDs ',xbd,q2d,-del2d,alu,F1pn(1), F2pn(1),
-     &             -H1_IM,-H1_RE, -H1T_IM,
-     &             -E1_IM, -E1T_IM,H1_RE,H1T_RE,E1_RE,E1T_RE,C_I_im
-        write(6,'(A,18F10.5)') 'BM-GPD2 ',del2minc,P1,P2,Kfac,Jfac,ds,
-     &hc0BH,hc1BH/hc0BH,hc2BH/hc0BH,hs1Iunp/hc0BH,hc0Iunp/hc0BH,hc0dvcs/hc0BH
-        write(6,'(A,18F10.5)') 'BM-MOM  ',ac0int,ac1int,as1int,ac0dvcs,ac1dvcs
-        endif ! if( del2d.....
-        enddo
-        endif  !if( .not.outoflimits
-        enddo
-        enddo
-c
-        print *,'STOP-here'
-        return
-        end
-c
+
         subroutine printusage
         print *,'dvcspi0gen [options]            '
         print *,'      option  value      default    comment  '
         print *,'     --pi0                    exclusive pi-0 on '
         print *,'     --eta                    exclusive eta on '
         print *,'     --nodvcs                 DVCS off '
-        print *,'     --v    verbos_level    0  additional printout '
-        print *,'     --trig nevents  10      number of triggers '
-        print *,'     --seed seed_number 0-use local time '
-        print *,'     --nmax nevents   40k     # of triggers per file '
-        print *,'     --beam beam_energy   5.754 e- momentum in GeV'
-        print *,'     --ycol P_1 cut        0.005      P_1>ycol_cut'
-        print *,'     --x  x-min   x-max   0.1 0.65   min max x_Bj '
-        print *,'     --q2 Q2-min Q2-max 1.0  10. min max Q2 in GeV^2 '
-        print *,'     --y y-min y-max 0.05 0.9    min max for y=nu/E'
-        print *,'     --w w^2-min         4.0 min for w^2=M^2+2MyE-Q^2'
-        print *,'     --t tmin tmax  0 1.0      t  min/max in GeV^2 '
-        print *,'     --th thmin thmax  0.2 1 theta min/max \theta rad'
-        print *,'     --xpos x-position      0 beam x position in cm '
-        print *,'     --ypos y-position      0 beam y position in cm '
-        print *,'     --zpos z-position      0 target z position in cm '
-        print *,'     --zwidth z-width 0  width z in cm (zpos+/-zwidth)'
-        print *,'      --raster diameter 0.75   raster diameter in cm  '
-        print *,'     --weight   flat distributions with weight(part12)'
-        print *,'     --printgpd               print gpds and exit '
+        print *,'     --v    verbos_level    0       additional printout '
+        print *,'     --trig nevents         10      number of triggers '
+        print *,'     --beam beam_energy     5.776    e- momentum in GeV '
+        print *,'     --ycol ycol_cut        0.05      ycol-y>ycol_cut '
+        print *,'     --x  x-min   x-max   0.15 0.65   min max x_Bj '
+        print *,'     --q2 Q2-min Q2-max   1.2  8.0    min max Q2 in GeV^2 '
+        print *,'     --y y-min y-max      0.05 0.9    min max for y=nu/E      '
+        print *,'     --w2 w^2-min         4.0         min for w^2=M^2+2MyE-Q^2      '
+        print *,'     --t tmin tmax         0 1.0      t  min/max in GeV^2 '
+        print *,'     --th thmin thmax            theta min/max for \theta in mrad'
+        print *,'     --zpos z-position      0    target z position in mm '
+        print *,'     --zwidth z-width       0    width in z in mm (zpos+/-zwidth) '
+        print *,'     --file bos_file     dvcsgen.evt  bos outfile '
+        print *,'     --weight                    flat distributions with weight(part12)'
+        print *,'     --bos                write out the bos file '
         print *,'     --nont               do not write out the ntuple '
-        print *,'     --file              dvcspi0gen   filename'
-        print *,'     --gpd  Igpd 3  GPD model(1-A,2-B,3-C,4-D)>=100VGG'
-        print *,'     --scale  scale      1.0   scale the sinphi-mom '
-        print *,'     --targ target       proton   deut/neut possible '
+        print *,'     --rndm               randomize '
+        print *,'     --gpd  Igpd          1    GPD model (1-A,2-B,3-C,4-D) '
+        print *,'     --targ target       proton   deuteron/neutron possible '
         print *,'     --lpol                    Long.pol.target  '
         print *,'     --tpol                    Trans.pol.target  '
-        print *,'     --writef    format      0-lund12, 1-lundgsim'
-        print *,'     --mod     write-mod      0-all, 1-cut on events'
-        print *,'     --mom                include moments in ntuple'
+        print *,'     --mom                     include moments in ntuple  '
         print *,'     --proloss                  add proton loss'
-        print *,'     --ktcor          FALSE   turn on k_t cor for A_LU'
-        print *,'     --globalfit      FALSE   use the global fitting results of EM form factors'
-        print *,'     --radgen                   include bhradgen'
-        print *,'     --radstable                use born cross sections for rejection sampling'
-        print *,'     --nodat               do not write a data file'
-        print *,'     --acce16            include e16 acceptance for e-'
-        print *,'     --acceg1           include eg1 acceptance for e-'
-        print *,'     --acc12         include clas++ acceptance for e-'
+        print *,'     --radgen                   include radgen'
+        print *,'     --nodat                    do not write a data 
+     +	file'
+        print *,'     --acce16                   include e16 acceptance 
+     +	for e-'
+        print *,'     --acceg1                   include eg1 acceptance 
+     +	for e-'
+        print *,'     --acc12                   include clas++ acceptance 
+     +	for e-'
         print *,'     --smear                   smear moments'
+        print *,'     --bossmear                smear also bos output'
         print *,'     --A    value         0.006   smear param-A'
         print *,'     --B    value         0.001  smear param-B'
         print *,'     --C    value         0.0008  smear param-C'
         print *,'     --D    value         0.001  smear param-D'
-        print *,'     --nmax   value     2000  maximum events per file'
-        print *,'     --print nprint     1000   print ev nprint event '
-        print *,'     --bh  value      3 BH status:3-All, 1-only BH  ' 
-        print *,'     --delta  value      0.01 Minimum rad photon energy (GeV)'
-        print *,'     --vv2cut value      0.1 cuts on missing mass ep squared (GeV^2)'
+        print *,'     --print nprint       1000   print every nprint event '
         return
         end
 c
@@ -599,47 +449,28 @@ c
         print *,'generators:       DVCS->',cl_dvcs,'    pi-0->',cl_pi0     
         print *,'NEVENTS:             ',cl_triggers    
         print *,'BEAM ENERGY  :         ',cl_beam_energy  
-        print *,'BH status:3-All, 1-only BH  :  ',cl_bh  
+        print *,'BH C->dN/dk=1/(k+C)  :  ',cl_bh  
         print *,'w^2   min    :         ',cl_wmin  
         print *,'y   min/max:         ',cl_ymin,cl_ymax  
-        print *,'Eprime thmin/thmax in rad: ',cl_thmin,cl_thmax  
+        print *,'Eprime thmin/thmax:         ',cl_thmin,cl_thmax  
         print *,'-Delta  tmin/tmax:         ',cl_tmin,cl_tmax  
         print *,'Q2  q2min/q2max:         ',cl_q2min,cl_q2max  
         print *,'x  xmin/xmax:         ',cl_xmin,cl_xmax  
         print *,'TARGET:              ', cl_target 
-        print *,'BEAM x-position in cm:   ', cl_xpos 
-        print *,'BEAM y-position in cm:   ', cl_ypos 
-        print *,'TARGET z-position in cm:   ', cl_zpos 
-        print *,'TARGET 1/2 width in cm:   ', cl_zwidth 
-        print *,'raster diameter(cm)  :   ', cl_rast
+        print *,'TARGET z-position:   ', cl_zpos 
+        print *,'TARGET 1/2 width :   ', cl_zwidth 
         print *,'Tpol (0-U,1-L,2-T):   ', cl_pol 
         print *,'GPD model A,B,C,D:   ', cl_gpd 
-        print *,'GPD sinphi scale:   ', cl_scale 
-        print *,'BHRADGEN ON        :   ', cl_radgen 
-        print *,'External Radiative Correct ON        :   ', cl_radext 
-        print *,'Use Born Cross sections when bhradgen on :   ', cl_radstable
+        print *,'RADGEN ON        :   ', cl_radgen 
         print *,'y_col cut        :   ', cl_ycol 
         print *,'acceptance       :   ',acceg1,acce16,acc12
-        print *,'nmax-events       :   ',cl_nmax
         print *,'write form      :   ',cl_writef
-        print *,'write mod       :   ',cl_mod
-        print *,'Minimum rad photon energy:  ',cl_delta
-        print *,'cuts on missing mass ep (GeV^2):  ',cl_vv2cut
-        print *,'write file_name  :   ',bosout
         if(cl_mom) print *,'include moments in the ntuple:   ', cl_mom 
         if(cl_smear.eq.1) 
      6print *,'smearing A,B,C,D:   ', cl_sma,cl_smb,cl_smc,cl_smd
-     6,cl_proloss  
+     6,cl_proloss,'in bos ',bossmearOK  
         print *,'__________________________________'
         print *,'verbosity level',  cl_verblev
-	if(cl_tmax.gt.1.0.and.cl_dvcs.and.cl_gpd.lt.100) then
-	  print *,'t>0.5 not supported for --gpd <100:  ',cl_tmax
-	  call exit(-1)
-	endif 
-	if(cl_tmax.gt.1.79.and.cl_dvcs.and.cl_gpd.ge.100) then
-	  print *,'t>1 not supported for --gpd >100:  ',cl_tmax
-	  call exit(-1)
-	endif 
         return
         end
 
@@ -656,32 +487,29 @@ C.. Set up cuts and parameters which are different from the default
 C.. valules 
 c
 C..
-        integer nx,nq,nt,nfe,nfg
+        integer nx,nq,nt2,nfe,nfg
         real  xmax,xmin,q2max,q2min,tmax,tmin 
         common /xmax/  xmax,xmin,q2max,q2min,tmax,tmin 
-     6                 ,nx,nq,nt,nfe,nfg
+     6                 ,nx,nq,nt2,nfe,nfg
 C..
 c
           CHARACTER*2 CTARGET
           integer lst40
+          real  beam_energy
 c
 C..
-        real  elmax,elmin,ttmax,ttmin
+        real  elmax,elmin,ttmax,ttmin 
 C..
         Ifl=1   !dsigma/dx/dq/dt/dphiel/dpigam
-        Ivar=cl_bh  ! BH+DVCS if 3
+        Ivar=3  ! BH+DVCS
         IGPD=cl_gpd  ! GPD type
         cl_be=cl_beam_energy
         Ich=-1
 C.. 
         nx=40
         nq=20
-        nt=40
-        if(cl_pol.eq.2) then 
-            nfe=36
-        else
-            nfe=1
-        endif
+        nt2=40
+        nfe=36
         nfg=36 
 C.. $x$ min cut  
        xmin=cl_xmin
@@ -697,9 +525,9 @@ C.. t min cut
        tmin=-cl_tmax
 c
 C.. lower limit scat. lep. energy
-       elmin=(1.0-cl_ymin)*cl_be
+       elmin=(1.0-cl_ymin)*cl_beam_energy
 C..  upper limit scat. lep. energy
-       elmax=(1.0-cl_ymax)*cl_be
+       elmax=(1.0-cl_ymax)*cl_beam_energy
 c
 C.. lower limit scat lep. angle
        ttmin=cl_thmin !0.52-0.08          ! 29.75 degree+/-4
@@ -707,7 +535,7 @@ C..  upper limit scat lep. angle
        ttmax=cl_thmax !0.52+0.08
 c
 C.. Momentum of incoming lepton (in GeV)
-       Ed = cl_be  
+       Ed = cl_beam_energy  
 
 C.. Simulation for a proton
       if(cl_target.eq.'neutron') then
@@ -723,27 +551,22 @@ C.. Simulation for a proton
 C
 C       get the maximum 5-dim x-section
 C
-        if(cl_printgpd) then 
-        call printgpd
-        stop
-        endif
         print *,'CALL getSCALE-->',Ipn,xmax,xmin,tmax,tmin
         CALL getSCALE
-c
+
         if(cl_radgen) then
-c         lst40=0  ! unpolarized case
-c         beam_energy=cl_beam_energy
-c         call radgen_init(ctarget,beam_energy,lst40)
-         ikeygene = 4
-
-
-        endif 
+         lst40=0  ! unpolarized case
+         beam_energy=cl_beam_energy
+         print *, 'call radgen_init(ctarget,beam_energy,lst40)'
+        call radgen_init(ctarget,beam_energy,lst40)
+c	stop
+	endif 
 c
         RETURN
         END
 c
 c
-        SUBROUTINE  getSCALE
+        SUBROUTINE  getSCALE      
         implicit none
 #include "dvcs.inc"
 C..
@@ -758,18 +581,16 @@ c internal variables
 c
         real dx,dq,dt,dfe,dfg,cix,cit,ciq,cife,cifg
         integer ix,iq,it,ife,ifg,la0
-        logical outoflimits
-        real altime,alltime(2)
-        real*8 t1lim, t2lim
+	logical outoflimits
 c
         smax=0.0
         la0=0
         dx=(xmax-xmin)/nx
         dq=(q2max-q2min)/nq
+        dt=(tmax-tmin)/nt
         dfe=2*pi/nfe
         dfg=2*pi/nfg
         if(cl_pol.ge.1) la0=-1
-       if(cl_verblev.gt.50) print *,'loop limits',nx,xmin,dx,nq,q2min,dq,nt,tmin,dt
           DO helpi=la0,1,2
             DO heli=-1,1,2
          stotint=0
@@ -787,14 +608,6 @@ c
          if( .not.outoflimits(xbd,Q2d) ) then
 c
              DO it=1,nt
-                 t2lim=-0.5d0*((q2d/xbd-q2d)*(q2d/xbd+sqrt((q2d/xbd)**2+4d0*Mp*Mp*q2d))+2d0*Mp*Mp*q2d)/w2
-                 t1lim=-0.5d0*((q2d/xbd-q2d)*(q2d/xbd-sqrt((q2d/xbd)**2+4d0*Mp*Mp*q2d))+2d0*Mp*Mp*q2d)/w2
-                 tmax = min(-cl_tmin, t1lim)
-                 tmin = max(-cl_tmax, t2lim)
-                 if (tmax<tmin) then
-                    cycle
-                 endif
-              dt=(tmax-tmin)/nt
               del2d=tmin+it*dt
               cit=1.0
              if(it.eq.1.or.it.eq.nx) cit=0.5
@@ -802,58 +615,41 @@ c
                phield=ife*dfe
                cife=1.0
                if(ife.eq.1.or.ife.eq.nx) cife=0.5
-               if(cl_pol.le.1) cife = 1
                DO ifg=1,nfg
                 phigd=ifg*dfg
                 cifg=1.0
                 if(ifg.eq.1.or.ifg.eq.nx) cifg=0.5
-c
-             if(cl_dvcs) then
-                if(cl_radgen.and.(.not.cl_radstable)) then
-                    xff = xbd
-                    q2ff = Q2d
-                    tff = del2d
-                    phiff = pi-phigd
-                    ebeamff = cl_beam_energy
-                    ikeygene = 4
-                    CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot)
-                    if (isnan(dstot).or.(dstot.le.0).or.(dstot.gt.huge(dstot))) then
-                     dstot = 0
-                    endif                    
-                    dstot = dstot/2.0/pi
-                else
-                    CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
-                endif
-             else if(cl_pi0.or.cl_eta) then
-              CALL excpi0(xbd, Q2d, del2d, phield,phigd,dstot)
-             else
-              print *,'ERROR! at least one reaction should be ON'
-              stop
-             endif
-c
-             if (dstot>0) stotint=stotint+dstot*cix*cit*ciq*cife*cifg*dx*dt*dq*dfe*dfg
+
+       if(cl_dvcs) then
+        CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
+       else if(cl_pi0) then
+        CALL excpi0(xbd, Q2d, del2d, phield,phigd,dstot)
+       else
+        print *,'ERROR! at least one reaction should be ON'
+        stop
+       endif
+
+             stotint=stotint+dstot*cix*cit*ciq*cife*cifg
+c	if (dstot.ne.0.) print*,stotint,dstot,cix,cit,ciq,
+c     +	cife, cifg, xbd, Q2d, del2d, phield
 c
            if(smax.lt.dstot) then
             smax=dstot
             if(cl_verblev.gt.1) print *,
      6'smax',heli,helpi,xbd,q2d,del2d,stotint,dstot,smax
-
+c,etime()
            endif
 c
-       if(cl_verblev.gt.50) print *,'loopall',ix,iq,it,ife,ifg,dstot
             ENDDO
            ENDDO
         ENDDO
-       altime=etime(alltime)
-       if(cl_verblev.gt.50) print *,'loopin getscale',ix,iq,it,ife,ifg,dstot
-     6,altime,alltime(1),alltime(2)
        else
 c        print *,'bad-y',xmin,xmax,xbd,q2min,q2max,q2d,del2d
        endif
        ENDDO
        ENDDO
        if(cl_verblev.gt.-1) print *,'Maximum found at',SMAX,
-     6'x-sec(pb) = ',stotint
+     6'x-sec(pb) = ',stotint*dx*dt*dq*dfe*dfg,dx*dt*dq*dfe*dfg
           ENDDO
          ENDDO
         return
@@ -864,111 +660,101 @@ c        print *,'bad-y',xmin,xmax,xbd,q2min,q2max,q2d,del2d
 #include "dvcs.inc"
 #include "ntupgdvcs.inc"
 #include "tailcom.inc"
+
 ccc-Mick
 	common/radmick/PhRAD
 ccc-Mick
 ccc- Hyon-Suk
-        common/radhs/radtheta, ichannel
+        common/radhs/radtheta
         real radtheta
 ccc- Hyon-Suk
 
 C..
 C..
-        integer nx,nq,nt,nfe,nfg
+        integer nx,nq,nt2,nfe,nfg
         real  xmax,xmin,q2max,q2min,tmax,tmin 
         common /xmax/  xmax,xmin,q2max,q2min,tmax,tmin 
-     6                 ,nx,nq,nt,nfe,nfg
+     6                 ,nx,nq,nt2,nfe,nfg
 C..     generate a DVCS event
-      double precision xbd,Q2d,del2d,phield,phigd,dstot,yb,w2, costgg
+      double precision xbd,Q2d,del2d,phield,phigd,dstot,yb,w2
 c
 c       radiative stuff
 c
         real VPGEN(4),VPRAD(4),PhRAD(4),q2tr,utr,weight
-c
         REAL PolarTheta, Azimuthalphi
+
         REAL VEC(8),e_photon,prob_max,prob_curr,ggam2p
         INTEGER I,ITRY,LEN
         logical outoflimits
-        real  beam_energy
-        real*8 t1lim, t2lim
-        real random_num
-        real nud, nud_shifted
-c
-        beam_energy=cl_beam_energy
+
         LEN=8
         ITRY=0
- 10     CALL MYRANMAR(VEC,LEN)
-        Ed = cl_beam_energy
+ 10     CALL RANLUX(VEC,LEN)
         ITRY=ITRY+1
         xbd=xmin+(xmax-xmin)*VEC(1)
         Q2d=q2min+(q2max-q2min)*VEC(2)
-
-C         if(cl_radgen) then
-C ccc- Hyon-Suk
-C          PhRAD(1)=0.
-C          PhRAD(2)=0.
-C          PhRAD(3)=0.
-C          PhRAD(4)=0.
-C ccc- Hyon-Suk         
-C          radq2=Q2d
-C          radnu=Q2d/2.0/Mp/xbd
-C          if( outoflimits(xbd,Q2d) ) then
-C           if(itry .gt.10000.and.cl_verblev.eq.1000) 
-C      6print *,'stuck before radgen:',itry,istatus,xbd,q2d
-C           goto 10 
-C          endif
-C          call getgammastar(xbd,Q2d,phield,VPGEN)
-C  !	 call RADGEN(beam_energy,VPGEN,VPRAD,PhRAD,q2tr,utr,weight)
-C          Q2d=q2tr
-C          xbd=Q2d/2.0/Mp/utr
-C          if( outoflimits(xbd,Q2d) ) then
-C           if(itry .gt.10000.and.cl_verblev.eq.1000) 
-C      6print *,'stuck after radgen:',itry,istatus,xbd,q2d
-C           goto 10 
-C          endif
-C c
-C          ggam2p=PhRAD(1)**2+PhRAD(2)**2+PhRAD(3)**2
-C          PhRAD(4)=sqrt(ggam2p)
-C          if(ggam2p.gt.0) then
-C            gradt=PolarTheta(PhRAD(1),PhRAD(2),PhRAD(3))
-C            gradf=Azimuthalphi(PhRAD(1),PhRAD(2))
-C            grade=PhRAD(4)
-C           else 
-C            gradt=0
-C            gradf=0
-C            grade=0
-C          endif   
-C            radweight=weight !del2d
-C            gelebits=ita
-C ccc- Hyon-Suk
-C          radtheta=gradt
-C ccc- Hyon-Suk
-C         endif
-
-
+        
+        if(cl_radgen) then
+ccc- Hyon-Suk
+         PhRAD(1)=0.
+         PhRAD(2)=0.
+         PhRAD(3)=0.
+         PhRAD(4)=0.
+ccc- Hyon-Suk         
+         radq2=Q2d
+         radnu=Q2d/2.0/Mp/xbd
+         if( outoflimits(xbd,Q2d) ) then
+          if(itry .gt.10000.and.cl_verblev.eq.1000) 
+     6print *,'stuck before radgen:',itry,istatus,xbd,q2d
+          goto 10 
+         endif
+         call getgammastar(xbd,Q2d,phield,VPGEN)
+c     print *,'call RADGEN(cl_beam_energy,VPGEN,VPRAD,PhRAD,q2tr,
+c     utr,weight)'
+	 call RADGEN(cl_beam_energy,VPGEN,VPRAD,PhRAD,q2tr,utr,weight)
+         Q2d=q2tr
+         xbd=Q2d/2.0/Mp/utr
+         if( outoflimits(xbd,Q2d) ) then
+          if(itry .gt.10000.and.cl_verblev.eq.1000) 
+     6print *,'stuck after radgen:',itry,istatus,xbd,q2d
+          goto 10 
+         endif
+c
+         ggam2p=PhRAD(1)**2+PhRAD(2)**2+PhRAD(3)**2
+         PhRAD(4)=sqrt(ggam2p)
+         if(ggam2p.gt.0) then
+           gradt=PolarTheta(PhRAD(1),PhRAD(2),PhRAD(3))
+           gradf=Azimuthalphi(PhRAD(1),PhRAD(2))
+           grade=PhRAD(4)
+          else 
+           gradt=0
+           gradf=0
+           grade=0
+         endif   
+           radweight=weight !del2d
+           gelebits=ita
+ccc- Hyon-Suk
+         radtheta=gradt
+ccc- Hyon-Suk
+        endif
+        
+c        if((PhRAD(4).gt.0.1).and.(radtheta.gt.0.15)) print *,'genevent : PhRAD = ',PhRAD
+        
+        del2d=tmin+(tmax-tmin)*VEC(3)
         phield=2*pi*VEC(4)
         phigd=2*pi*VEC(5)
-        yb=Q2d/(2D0*Mp*xbd*cl_beam_energy)
-        w2=Mp*Mp+2.0*Mp*cl_beam_energy*yb-Q2d
-                 t2lim=-0.5d0*((Q2d/xbd-Q2d)*(Q2d/xbd+sqrt((Q2d/xbd)**2+4d0*Mp*Mp*Q2d))+2d0*Mp*Mp*Q2d)/w2
-                 t1lim=-0.5d0*((Q2d/xbd-Q2d)*(Q2d/xbd-sqrt((Q2d/xbd)**2+4d0*Mp*Mp*Q2d))+2d0*Mp*Mp*Q2d)/w2
-
-        tmax = -cl_tmin
-        tmin = -cl_tmax
-        del2d=tmin+(tmax-tmin)*VEC(3)
-        if( del2d.ge.t1lim .or. del2d.le.t2lim ) goto 10   ! delta out of range
+c        yb=Q2d/(2D0*Mp*xbd*cl_beam_energy)
+c        w2=Mp*Mp+2.0*Mp*cl_beam_energy*yb-Q2d
 ccc- Hyon-Suk
-C         if(radtheta.gt.0.15) then
-C          yb=Q2d/(2D0*Mp*xbd*cl_beam_energy)
-C          w2=Mp*Mp+2.0*Mp*cl_beam_energy*yb-Q2d
-C         else
-C          yb=Q2d/(2D0*Mp*xbd*(cl_beam_energy-PhRAD(4)))
-C          w2=Mp*Mp+2.0*Mp*(cl_beam_energy-PhRAD(4))*yb-Q2d
-C         endif
+        if(radtheta.gt.0.15) then
+         yb=Q2d/(2D0*Mp*xbd*cl_beam_energy)
+         w2=Mp*Mp+2.0*Mp*cl_beam_energy*yb-Q2d
+        else
+         yb=Q2d/(2D0*Mp*xbd*(cl_beam_energy-PhRAD(4)))
+         w2=Mp*Mp+2.0*Mp*(cl_beam_energy-PhRAD(4))*yb-Q2d
+        endif
 ccc- Hyon-Suk
-        if(yb.gt.cl_ymax.or.w2.lt.cl_wmin.or.yb.lt.cl_ymin) then 
-             goto 10
-         endif
+        if(yb.gt.cl_ymax.or.w2.lt.cl_wmin) goto 10
 c
 c       random helicities of beam and target
 c
@@ -980,78 +766,32 @@ c
         else
          helpi=0
         endif
-
-        randnum = random_num() ! common number used for vz
 c
         if(cl_dvcs) then
 C..     Generation of an event in GENDVCS 
-            if (cl_radgen) then
-                    CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
-                    bornweight = dstot
-                    if (isnan(bornweight).or.(bornweight.le.0).or.(bornweight.gt.huge(bornweight))) goto 10
-                    if (cl_radext) then
-                     ebeamff = beam_energy - beam_energy * random_num()**(3./4./ (randnum*cl_zwidth/929.0 + 0.003/8.897))
-                    else
-                     ebeamff = beam_energy 
-                    endif
-                    ! External radiative correction, following L. W. Mo and Y. S. Tsai. Rev. Mod. Phys. 41, 205–235, 1969.
-                    ! Inverse transform sampling, dE = E0 * r ^ (1/bT), where the distribution is I(x) = bT*(x)^(bT-1), where 0<x=dE/E<1.
-                    ! T is the material thickness in units of radiation length.
-                    ! For the rg-a target, there is 30 µm aluminum window + LH2 (depending on the vz).
-                    !LH2 x0 = 929 cm, https://github.com/JeffersonLab/JPsiGen/blob/eb40dd934bb9f022873414a57e0dad9d1ccbcbdf/include/KinFunctions.h
-                    !Al  x0 = 8.897 cm,  https://pdg.lbl.gov/2022/AtomicNuclearProperties/HTML/aluminum_Al.html
-                    Ed = ebeamff
-                    ikeygene = 4
-                    nud = Q2d/(2D0*Mp*xbd)
-                    nud_shifted = nud - (cl_beam_energy - ebeamff)
-                    if (nud_shifted.le.0) goto 10 ! nu is the total energy change of beam to the scattered electron. The external energy loss can't exceed nu.
-                    q2ff = Q2d * ebeamff/cl_beam_energy ! Q2 = 2 * E_beam * E_sc * ( 1-cos theta). Taking into account that the E_beam is reduced is necessary for the correct cross section.
-                    xff = q2ff/(2D0*Mp*nud_shifted) ! Likewise, xB is shifted; nu -> nu - dE, xB = Q2/2/M/nu
-                    tff = del2d
-                    phiff = pi-phigd
-                    CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot)
-                    if (isnan(dstot).or.(dstot.le.0).or.(dstot.gt.huge(dstot))) then
-                     dstot = 0
-                    endif
-                    dstot = dstot/2.0/pi
-                    radweight = dstot
-                    radq2 = Q2d
-                    radxb = xbd
-                    radt = del2d
-                    radphi = phigd
-                    iproctype = ichannel
-                    PhRAD(4) = egamma
-            else
-                ebeamff = cl_beam_energy
-                Ed = ebeamff
-                CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
-                    bornweight = dstot
-                    radweight = dstot
-                    radq2 = Q2d
-                    radxb = xbd
-                    radt = del2d
-                    radphi = phigd
-            endif
+        CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
         else
         CALL excpi0(xbd, Q2d, del2d, phield,phigd,dstot)
         endif
 c
-       if(itry.GE.100000)  print *,'Check the limits',itry,smax
-     & ,heli,xbd, Q2d, del2d, phield, phigd, dstot
+c       if(itry.GE.100000)  print *,'Check the limits',itry,smax
+c     & ,heli,xbd, Q2d, del2d, phield, phigd, dstot
         if(weightOK) then
-          if(dstot.le.1.0E-8.or.istatus.ne.0) goto 10 !put in the weight 
+          if(dstot.le.1.0E-8) goto 10      !put in the weight 
         else
           if(dstot.le.smax*VEC(6)) goto 10 ! use x-section
         endif
         if(cl_dvcs) then
-           call getphoton(xbd,Q2d,del2d,phield,phigd,costgg)
-           if (costgg>1) goto 10
+           call getphoton(xbd,Q2d,del2d,phield,phigd)
         else
            call getpi0(xbd,  Q2d, del2d,phield,phigd)
         endif
        if(cl_verblev.gt.100) print *,'hel,x,q2,-t,tot'
      & ,heli,helpi,xbd, Q2d, del2d,phigd,dstot
        gelewgt=dstot/smax
+       gelex=del2d
+       geley=Q2d
+       gelez=phigd
        gprox=xbd
        gproy=phield
        gproz=0
@@ -1062,8 +802,7 @@ C**********************************************************************
 C      random number generator
 C**********************************************************************
          real function random_num()
-c         CALL RANDOM_SEED()
-         CALL RANDOM_NUMBER(random_num)
+         random_num=rndm(-1)
          return
          end
 
@@ -1073,21 +812,50 @@ C***********************************************************************
 C***********************************************************************
 #include "ntupgdvcs.inc"
 #include "dvcsmom.inc"
-#include "ludat1234.inc"
        call VZERO(gnele,12)
-       call VZERO(gnpi0,30)
+       call VZERO(gnpi0,35)
        call resetmom()
 
        return
        end
 c
 C***********************************************************************
-      SUBROUTINE CLASFILL(IEVENT)
+         SUBROUTINE smearbos(part,part_id,pener,ptheta,pphi)
 C***********************************************************************
+          IMPLICIT NONE
+#include "bcs.inc"
+         real pmom,pener,ptheta,pphi
+         integer part,part_id
+         SELECT CASE (part_id)  
+         CASE (3) ! electron
+         pmom=pener
+         CASE (14) ! proton
+         pmom=pener*pener-0.88035
+         if(pmom.gt.0) pmom=sqrt(pmom)
+         CASE (1) ! gamma
+         pmom=pener
+         CASE DEFAULT
+         END SELECT       
+c
+         rw(part+5)	= pener  ! energy (pmom=p^2) 
+         rw(part+6)	= pmom*sin(ptheta)*cos(pphi)		! px
+         rw(part+7)	= pmom*sin(ptheta)*sin(pphi)		! py
+         rw(part+8)	= pmom*cos(ptheta)		! pz
+         print *,part,part_id,pener,ptheta,pphi
+         return
+         end
+c
+c
+c
+C***********************************************************************
+      SUBROUTINE CLASBOSFILL(IEVENT)
+C***********************************************************************
+#include "bcs.inc"
 #include "dvcs.inc"
 #include "dvcsmom.inc"
 #include "ntupgdvcs.inc"
 #include "ludat1234.inc"
+
 ccc-Mick
 	common/radmick/PhRAD
 ccc-Mick
@@ -1101,200 +869,261 @@ ccc- Hyon-Suk
         REAL PolarTheta, Azimuthalphi
 c
 c
-        real ppmod2
-        real pmy(4000,5)
-        integer kmy(4000,5)
+          integer ierr,lunout
+	  parameter (lunout=33)
+          INTEGER ind,indx,mctk,mcvx,mbank,part,boswrite
+          INTEGER j,jj
+          LOGICAL lOK
+          real pcharge(10),z_cible
+C ********************************************************
+C       Write to the output event file
+C ********************************************************
+       call bdrop(iw,'E')
+       call bgarb(iw)
+       ind=mbank(iw,'HEAD',0,8,1)
+       if(ind.ne.0)then
+          iw(ind+1)=1
+          iw(ind+2)=1
+          iw(ind+3)=IEVENT
+          iw(ind+4)= 100                	! event time
+          iw(ind+5)=-4
+          iw(ind+6)=0
+          iw(ind+7)=15
+          iw(ind+8)=0
+       endif
+      ind= nbank('TGBI',0,4,1)
+       if(ind.ne.0)then
+         if (cl_pol.gt.0.5) then
+          iw(ind+1) = 32768
+         else
+          iw(ind+1) = 0 
+         endif
+      endif
 c
-        integer ierr,lunout
-        INTEGER j,jj
-        real pcharge(10)
-c
-C..     fill lund
+c     fill lund
 c
 c    electron
        DO j=1,3
-        pmy(1,j)=V3k2(j)
-        pmy(2,j)=V3p2(j)
+        p(1,j)=V3k2(j)
+        p(2,j)=V3p2(j)
+        p(3,j)=V3gam(j)
+        if(cl_pi0) p(4,j)=V3gam2(j)     ! second photon    
        ENDDO
-c 
-        pmy(1,5)=mele ! mass of el
-        pmy(2,5)=Mp    !mass of proton
-        pmy(1,4)=sqrt(mele**2+pmy(1,1)**2+pmy(1,2)**2+pmy(1,3)**2)
-        ppmod2 =pmy(2,1)**2+pmy(2,2)**2+pmy(2,3)**2
-        if(ppmod2.gt.0.and.ppmod2.lt.1000.0) then
-         pmy(2,4)=sqrt(Mp**2+ppmod2)
-        else
-c             dump this events
-         return
-        endif
 c
+c 
+        p(1,5)=mele ! mass of el
+        p(2,5)=Mp    !mass of proton
+        p(3,5)=0.0      ! gamma
         pcharge(1)=-1
         pcharge(2)=1
-c
-       kmy(1,2)=11  ! electron
-       kmy(2,2)=2212 ! proton
-       kmy(1,1)=1    ! final
-       kmy(2,1)=1    ! final
-c       
-       do j=1,N-1
-        do l=1,5
-         pmy(2+j,l)=p(j+1,l)  ! j-is the decaying particle
-         kmy(2+j,l)=k(j+1,l)
-        enddo
-       enddo
+        pcharge(3)=0
+       k(1,2)=11  ! electron
+       k(2,2)=2212 ! proton
+       k(3,2)=22   ! photon
+       jj=3
+       if(cl_pi0) then      ! second photon from pi-0
+        k(4,2)=22
+        p(4,5)=0.0
+        pcharge(4)=0 
+        jj=4                 ! number of particles
+       endif
 
-       jj=N+1
-c
+ccc- Hyon-Suk
+c       if(phrad(4).gt.0.) then
+c       print *,'=== clasbosfill : PhRAD = ',PhRAD
+c       print *,'==== before PhRAD ===='
+c       print *,'old pxe=',p(1,1)
+c       print *,'old pye=',p(1,2)
+c       print *,'old pze=',p(1,3)
+c       print *,'old Ee=',sqrt(p(1,5)*p(1,5)+p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3))
+c       print *,'==== after PhRAD ===='
+c       print *,'new pxe=',p(1,1)
+c       print *,'new pye=',p(1,2)
+c       print *,'new pze=',p(1,3)
+c       print *,'pxrad=',PhRAD(1)
+c       print *,'pyrad=',PhRAD(2)
+c       print *,'pzrad=',PhRAD(3)
+c       print *,'new Ee=',sqrt(p(1,5)*p(1,5)+p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3))
+c       print *,'Erad=',sqrt(PhRAD(1)*PhRAD(1)+PhRAD(2)*PhRAD(2)+PhRAD(3)*PhRAD(3))
+c       print *,'PhRAD(4)=',PhRAD(4)
+c       print *,'==== checks ===='
+c       print *,'check px=',p(1,1)+PhRAD(1)
+c       print *,'check py=',p(1,2)+PhRAD(2)
+c       print *,'check pz=',p(1,3)+PhRAD(3)
+c       print *,'check E=',sqrt(p(1,5)*p(1,5)+p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3))+sqrt(PhRAD(1)*PhRAD(1)+PhRAD(2)*PhRAD(2)+PhRAD(3)*PhRAD(3))
+c       print *,'==== without PhRAD ===='
+c       print *,'!!!!!! px : -p(1,1)-p(2,1)-p(3,1) = ',-p(1,1)-p(2,1)-p(3,1)
+c       print *,'pxe=',p(1,1)
+c       print *,'pxp=',p(2,1)
+c       print *,'pxg=',p(3,1)
+c       print *,'pxrad=',PhRAD(1)
+c       print *,'!!!!!! py : -p(1,2)-p(2,2)-p(3,2) = ',-p(1,2)-p(2,2)-p(3,2)
+c       print *,'pye=',p(1,2)
+c       print *,'pyp=',p(2,2)
+c       print *,'pyg=',p(3,2)
+c       print *,'pyrad=',PhRAD(2)
+c       print *,'!!!!!! pz : 5.776-p(1,3)-p(2,3)-p(3,3) = ',5.776-p(1,3)-p(2,3)-p(3,3)
+c       print *,'pze=',p(1,3)
+c       print *,'pzp=',p(2,3)
+c       print *,'pzg=',p(3,3)
+c       print *,'pzrad=',PhRAD(3)
+c       print *,'!!!!!! E : cl_beam_energy+Mp-sqrt(p(1,5)*p(1,5)+p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3))-sqrt(p(2,5)*p(2,5)+p(2,1)*p(2,1)+p(2,2)*p(2,2)+p(2,3)*p(2,3))-sqrt(p(3,5)*p(3,5)+p(3,1)*p(3,1)+p(3,2)*p(3,2)+p(3,3)*p(3,3)) = ',cl_beam_energy+Mp-sqrt(p(1,5)*p(1,5)+p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3))-sqrt(p(2,5)*p(2,5)+p(2,1)*p(2,1)+p(2,2)*p(2,2)+p(2,3)*p(2,3))-sqrt(p(3,5)*p(3,5)+p(3,1)*p(3,1)+p(3,2)*p(3,2)+p(3,3)*p(3,3))
+c       print *,'==== with PhRAD ===='
+c       print *,'!!!!!! px : -p(1,1)-p(2,1)-p(3,1)-p(4,1)-PhRAD(1) = ',-p(1,1)-p(2,1)-p(3,1)-p(4,1)-PhRAD(1)
+c       print *,'pxe=',p(1,1)
+c       print *,'pxp=',p(2,1)
+c       print *,'pxg1=',p(3,1)
+c       print *,'pxg2=',p(4,1)
+c       print *,'pxrad=',PhRAD(1)
+c       print *,'!!!!!! py : -p(1,2)-p(2,2)-p(3,2)-p(4,2)-PhRAD(2) = ',-p(1,2)-p(2,2)-p(3,2)-p(4,2)-PhRAD(2)
+c       print *,'pye=',p(1,2)
+c       print *,'pyp=',p(2,2)
+c       print *,'pyg1=',p(3,2)
+c       print *,'pyg2=',p(4,2)
+c       print *,'pyrad=',PhRAD(2)
+c       print *,'!!!!!! pz : 5.776-p(1,3)-p(2,3)-p(3,3)-p(4,3)-PhRAD(3) = ',5.776-p(1,3)-p(2,3)-p(3,3)-p(4,3)-PhRAD(3)
+c       print *,'pze=',p(1,3)
+c       print *,'pzp=',p(2,3)
+c       print *,'pzg1=',p(3,3)
+c       print *,'pzg2=',p(4,3)
+c       print *,'pzrad=',PhRAD(3)
+c       print *,'!!!!!! E : cl_beam_energy+Mp-sqrt(p(1,5)*p(1,5)+p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3))-sqrt(p(2,5)*p(2,5)+p(2,1)*p(2,1)+p(2,2)*p(2,2)+p(2,3)*p(2,3))-sqrt(p(3,5)*p(3,5)+p(3,1)*p(3,1)+p(3,2)*p(3,2)+p(3,3)*p(3,3))-sqrt(p(4,5)*p(4,5)+p(4,1)*p(4,1)+p(4,2)*p(4,2)+p(4,3)*p(4,3))-PhRAD(4) = ',cl_beam_energy+Mp-sqrt(p(1,5)*p(1,5)+p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3))-sqrt(p(2,5)*p(2,5)+p(2,1)*p(2,1)+p(2,2)*p(2,2)+p(2,3)*p(2,3))-sqrt(p(3,5)*p(3,5)+p(3,1)*p(3,1)+p(3,2)*p(3,2)+p(3,3)*p(3,3))-sqrt(p(4,5)*p(4,5)+p(4,1)*p(4,1)+p(4,2)*p(4,2)+p(4,3)*p(4,3))-PhRAD(4)
+c       print *,'cl_beam_energy=',cl_beam_energy
+c       print *,'Mp=',Mp
+c       print *,'p(1,5)=',p(1,5)
+c       print *,'p(2,5)=',p(2,5)
+c       print *,'p(3,5)=',p(3,5)
+c       print *,'p(4,5)=',p(4,5)
+c       print *,'Ee=',sqrt(p(1,5)*p(1,5)+p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3))
+c       print *,'Ep=',sqrt(p(2,5)*p(2,5)+p(2,1)*p(2,1)+p(2,2)*p(2,2)+p(2,3)*p(2,3))
+c       print *,'Eg1=',sqrt(p(3,5)*p(3,5)+p(3,1)*p(3,1)+p(3,2)*p(3,2)+p(3,3)*p(3,3))
+c       print *,'Eg2=',sqrt(p(4,5)*p(4,5)+p(4,1)*p(4,1)+p(4,2)*p(4,2)+p(4,3)*p(4,3))
+c       print *,'Erad=',sqrt(PhRAD(1)*PhRAD(1)+PhRAD(2)*PhRAD(2)+PhRAD(3)*PhRAD(3))
+c       print *,'PhRAD(4)=',PhRAD(4)
+c       print *,'======== what is actually written in BOS ========'
+c       print *,'pxe=',p(1,1)/(sqrt(p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3)))
+c       print *,'pxp=',p(2,1)/(sqrt(p(2,1)*p(2,1)+p(2,2)*p(2,2)+p(2,3)*p(2,3)))
+c       print *,'pxg1=',p(3,1)/(sqrt(p(3,1)*p(3,1)+p(3,2)*p(3,2)+p(3,3)*p(3,3)))
+c       print *,'pxg2=',p(4,1)/(sqrt(p(4,1)*p(4,1)+p(4,2)*p(4,2)+p(4,3)*p(4,3)))
+c       print *,'pye=',p(1,2)/(sqrt(p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3)))
+c       print *,'pyp=',p(2,2)/(sqrt(p(2,1)*p(2,1)+p(2,2)*p(2,2)+p(2,3)*p(2,3)))
+c       print *,'pyg1=',p(3,2)/(sqrt(p(3,1)*p(3,1)+p(3,2)*p(3,2)+p(3,3)*p(3,3)))
+c       print *,'pyg2=',p(4,2)/(sqrt(p(4,1)*p(4,1)+p(4,2)*p(4,2)+p(4,3)*p(4,3)))
+c       print *,'pze=',p(1,3)/(sqrt(p(1,1)*p(1,1)+p(1,2)*p(1,2)+p(1,3)*p(1,3)))
+c       print *,'pzp=',p(2,3)/(sqrt(p(2,1)*p(2,1)+p(2,2)*p(2,2)+p(2,3)*p(2,3)))
+c       print *,'pzg1=',p(3,3)/(sqrt(p(3,1)*p(3,1)+p(3,2)*p(3,2)+p(3,3)*p(3,3)))
+c       print *,'pzg2=',p(4,3)/(sqrt(p(4,1)*p(4,1)+p(4,2)*p(4,2)+p(4,3)*p(4,3)))
+c       endif
+ccc- Hyon-Suk
+
+c       part= nbank('PART',0,13,jj) 
+
+c       print *,heli
+
+       part = 1
+       if(part.ne.0)then
+         do 999 j=1,jj
+          pmom=p(j,1)*p(j,1)+p(j,2)*p(j,2)+p(j,3)*p(j,3)
+
+
+          z_cible = cl_zpos+(2.*random_num()-1)*cl_zwidth	! z vertex position
+c       if(part.ne.0) then
+c         iw(part+1)	= lund2geantid(k(j,2))	! particle ID (GEANT)
+c         rw(part+2)	= 0		! x vertex position
+c         rw(part+3)	= 0		! y vertex position
+c         rw(part+4)	= z_cible
+c         rw(part+5)	= sqrt(p(j,5)*p(j,5)+pmom)  ! energy (pmom=p^2) 
+c         rw(part+6)	= p(j,1)		! px
+c         rw(part+7)	= p(j,2)		! py
+c         rw(part+8)	= p(j,3)		! pz
+c         rw(part+9)	= pcharge(j)            ! charge
+c         iw(part+10) 	= j			! Track pointer
+c         rw(part+11)	= 0
+c         rw(part+12) 	= gelewgt
+c         iw(part+13) 	= heli+10*helpi   ! store helicities
+
+c         call write2hbook(part)
+
+c        part=part+13
+c       endif
+ 999  CONTINUE
+
+        mcvx = NBANK('MCVX',0,5,jj)
+        if(mcvx.ne.0) then
+           do j=1,jj
+           rw(MCVX+1) = 0
+           rw(MCVX+2) = 0
+           rw(MCVX+3) = z_cible
+           rw(MCVX+4) = 0.
+           iw(MCVX+5) = 0
+           mcvx = mcvx+5
+        enddo
+        endif
+
+c        mctk = nbank('MCTK',0,11,jj)
+
         IF( phrad(4).gt.0.010 ) THEN
-           jj=jj+1
+        mctk = nbank('MCTK',0,11,jj+1)
+	else
+        mctk = nbank('MCTK',0,11,jj)
+	endif
+		
+        if(mctk.ne.0) then
+           do j=1,jj
+           pmom=sqrt(p(j,1)*p(j,1)+p(j,2)*p(j,2)+p(j,3)*p(j,3))
+           rw(mctk+1)=p(j,1)/pmom
+           rw(mctk+2)=p(j,2)/pmom    
+           rw(mctk+3)=p(j,3)/pmom
+           rw(mctk+4)=pmom
+           rw(mctk+5)=p(j,5)
+           rw(mctk+6)=pcharge(j)
+           iw(mctk+7)=k(j,2)
+           iw(mctk+8)=0
+           iw(mctk+9)=1
+           iw(mctk+10)=0
+           iw(mctk+11)=0
+           mctk = mctk + 11
+           enddo
+        endif
+
+ccc-Mick
+c 	print*,"hello",phrad(4)
+        IF( phrad(4).gt.0.010 ) THEN
            theta_radgam=PolarTheta(PhRAD(1),PhRAD(2),PhRAD(3))
            phi_radgam=Azimuthalphi(PhRAD(1),PhRAD(2))
-           pmy(jj,1)=phrad(4)*sin(theta_radgam)*cos(phi_radgam)
-           pmy(jj,2)=phrad(4)*sin(theta_radgam)*sin(phi_radgam)
-           pmy(jj,3)=phrad(4)*cos(theta_radgam)
-           pmy(jj,4)=phrad(4)
-           kmy(jj,1)=1
-           kmy(jj,2)=22 ! radiative photon
-           pcharge(jj)=0
+           rw(mctk+1)=sin(theta_radgam)*cos(phi_radgam)
+           rw(mctk+2)=sin(theta_radgam)*sin(phi_radgam)
+           rw(mctk+3)=cos(theta_radgam)
+           rw(mctk+4)=phrad(4)
+           rw(mctk+5)=0.0
+           rw(mctk+6)=0.0
+           iw(mctk+7)=22
+           iw(mctk+8)=0
+           iw(mctk+9)=1
+           iw(mctk+10)=0
+           iw(mctk+11)=0
+	   MCTK = MCTK + 11
         ENDIF
+ccc-Mick
 
-c
-         do  j=1,jj
-          call fillevent(j,pmy,kmy)
-         enddo
-c
           call goodevent()     ! check the event
 c
           if(dvcsgenOK) then
-c            print *,'write-nt',gelee,ntOK
-            if (datfileOK) call  writefile(jj,pmy,kmy)
-#ifdef  hbook
             if(ntOK) call HFNT(22)
-#endif
+c            if (datfileOK) call  writefile(jj,pmy,kmy)
           endif
 c
-       return
-       end  
+c
+       endif
+c 
 
-C***********************************************************************
-c write compatible with kine_lund format
 c
-       subroutine writefile(jj,p,k)
-       implicit none
-#include "ntupgdvcs.inc"
-#include "dvcs.inc"
-        integer i,ifile,itotal,iparl1,iparl2
-        logical lFirst
-        DATA lFirst /.TRUE./
-        save lFirst
-          DATA ifile /0/
-          DATA itotal /20000/
-          character*21  fname
+      if(dvcsgenOK.and.bosOK) call fwbos(iw,33,'E',ierr)	! write banks to file
+      call bdrop(iw,'E')     		! drop the bank, reclaim the space
+      call bgarb(iw)	     		! garbage collection
 c
-        integer jj,j,jl,k(4000,5)
-        real gy,gw2,u,p(4000,5),rhelpi,rheli
-        real random_num
-        real PARL(2),plu(4),V(4)                   ! for LUND-compatibility
-        data PARL/1.0,1.0/
-        data plu/-1.0,1.0,0.0,0.0/
-        data v/0.0,0.0,0.0,0.0/
-c
-          if((itotal.eq.cl_nmax).or.lFirst) then
-           close (41)
-           lFirst=.TRUE.
-           ifile=ifile+1
-           itotal=0
-          endif
-c
-          if (lFirst) then   ! open the file
-           if(cl_docker) then
-             write(fname,'(A)') 'dvcsgen.dat'
-             cl_nmax=cl_triggers+100
-           else
-           if(ifile.le.9) then
-             write(fname,'(A,i1,A)') bosout,ifile,'.dat'
-             write(6,'(A,i1,A)') bosout,ifile,'.dat'
-           else if(ifile.ge.10.and.ifile.le.99) then
-            write(fname,'(A,i2,A)') bosout,ifile,'.dat'
-            write(6,'(A,i2,A)') bosout,ifile,'.dat'
-           else if(ifile.ge.100.and.ifile.le.999) then
-            write(fname,'(A,i3,A)') bosout,ifile,'.dat'
-            write(6,'(A,i3,A)') bosout,ifile,'.dat'
-           else
-            write(fname,'(A,i4,A)') bosout,ifile,'.dat'
-            write(6,'(A,i4,A)') bosout,ifile,'.dat'
-           endif 
-           endif ! docker check          
-             OPEN(unit=41,file=fname,status='unknown')
-             lFirst=.FALSE.
-          endif
-c
-                itotal=itotal+1
-c
-           gy=1.0-gelee/cl_beam_energy
-           gw2=gw*gw
-           u=heli+10*helpi
-            !randnum=random_num()-0.5
- 9         v(1)=(cl_rast*(random_num()-0.5)+cl_xpos)
-           v(2)=(cl_rast*(random_num()-0.5)+cl_ypos)
-      if(sqrt((v(1)-cl_xpos)**2+(v(2)-cl_ypos)**2).gt.cl_rast*0.5) goto 9 
-           v(3)=cl_zpos+(randnum-0.5)*cl_zwidth
-          gelex=v(1)
-          geley=v(2)
-          gelez=v(3)
-c
-          iparl1=PARL(1)
-          iparl2=PARL(2)
-          rhelpi=helpi
-          rheli=heli
-c101      FORMAT(2x,I10,2I6,2F11.2,I5,F10.3,2I5,2E14.7,2F6.2)
-         if(cl_writef.eq.0) then                  ! lund12 format
-                write(41,111) jj,iparl1,iparl2,rhelpi,rheli,11,
-     6                   cl_beam_energy,1,1,gsin2
-            do  j=1,jj
-                 P(j,4)=sqrt(P(j,1)**2+P(j,2)**2+P(j,3)**2+P(j,5)**2)
-                 write (41,112) j,plu(j),1,(k(j,jl),jl=2,4),(P(j,jl),jl=1,5)
-     6                                                   ,(V(jl),jl=1,3)
-            enddo
-          
-         else if(cl_writef.eq.1) then                  ! gsim-lund format
-           write(41,102) jj,gxb,gy,gw2,gq2,u
-            do  j=1,jj
-              write(41,101) (k(j,jl),jl=1,4),heli
-              write(41,103) (p(j,jl),jl=1,5) 
-              write(41,103) v(1),v(2),v(3),0.0,0.0 
-            enddo
-
-         else if(cl_writef.eq.2) then                  ! variation of lund12 format
-                write(41,111) jj,iparl1,iparl2,rhelpi,rheli,11,
-     6                   cl_beam_energy,1,1,radweight
-                 write (41,112) 1,radxb,1,(k(1,jl),jl=2,3),iproctype,(P(1,jl),jl=1,3),radq2,-radt
-     6                                                   ,(V(jl),jl=1,3)
-                 write (41,112) 2,radphi,1,(k(2,jl),jl=2,4),(P(2,jl),jl=1,3),radxb_true,radq2_true
-     6                                                   ,(V(jl),jl=1,3)
-                 write (41,113) 3,ebeamff,1,(k(3,jl),jl=2,4),(P(3,jl),jl=1,4),bornweight
-     6                                                   ,(V(jl),jl=1,3)
-
-                 if (jj.eq.4.) then
-                 P(jj,4)=sqrt(P(jj,1)**2+P(jj,2)**2+P(jj,3)**2+P(jj,5)**2)
-                 write (41,112) jj,plu(j),1,(k(jj,jl),jl=2,4),(P(jj,jl),jl=1,5)
-     6                                                   ,(V(jl),jl=1,3)
-                 endif
-
-         else
-            print *,'ERROR: unknown write format'
-            stop            
-         endif
-c
- 111      FORMAT(2x,I10,2I6,F3.0,2x,F3.0,I5,F10.3,2I5,E14.7)
-c 111      FORMAT(2x,I10,2F4.0,2I3,5F7.3)
- 112      FORMAT(2x,I3,2x,F10.4,2I5,2I3,5F10.4,2X,5F10.4)
- 113      FORMAT(2x,I3,2x,F10.4,2I5,2I3,4F10.4,E14.7,2X,5F10.4)
- 101      FORMAT(2x,10I10)
- 102      FORMAT(2x,I5,10F10.4)
- 103      FORMAT(2x,10F10.4)
-        return
-        end
+      RETURN
+      END     
 
 C***********************************************************************
       SUBROUTINE goodevent()
@@ -1312,6 +1141,7 @@ C***********************************************************************
        dvcsgenOK=.FALSE.
        ebeam=cl_beam_energy
        anu=ebeam-gelee
+c
            if(acceg1) then
         iaccept=eg1amcaccept(cl_beam_energy,gelee,gelet,gelef)
            if(iaccept.eq.0) return
@@ -1321,8 +1151,7 @@ c
         iaccept=accep11(11,gelee,gelet,gelef,2250.0)
            if(iaccept.eq.0) return
            endif
-c
-c        print *,'here1'
+
        if (gnpro.gt.0) then 
           gprotg=gamel(0,1)   ! prot_gamm e
           gprotl=gamel(0,2)   ! prot_gamm e'
@@ -1331,7 +1160,6 @@ c        print *,'here1'
           gprott=tchan(4)
           gprofs=phistar(4)
         endif
-c
         if (gngam.gt.0) then
           gproz=thetagg()
         endif 
@@ -1339,29 +1167,6 @@ c
           gprox=mismas(0)
         endif
 
-c
-c      check the write mod
-c
-        if(cl_mod.eq.1) then
-         if (ggamt.lt.0.0348.or.ggamt.gt.0.087) then   ! photons from 2 to 5 degree
-          return
-         endif
-        endif
-c
-        if(cl_mod.eq.2) then     ! FX cuts
-        iOK=0
-         if (0.15.lt.gxb.and.0.2.gt.gxb.and.
-     6       (gelet*180/3.1415.gt.26.0).and.gelee.gt.0.8.and.
-     6       gprott.gt.0.2.and.gprott.lt.0.25) iOK=1 ! bin 1
-         if (0.3.lt.gxb.and.0.4.gt.gxb.and.
-     6       (gelet*180/3.1415.gt.21.0).and.(23.5.gt.gelet*180/3.1415)
-     6       .and.gprott.gt.0.2.and.gprott.lt.0.25) iOK=1 ! bin 2
-         if (0.3.lt.gxb.and.0.4.gt.gxb.and.
-     6       (gelet*180/3.1415.gt.21.0).and.(23.5.gt.gelet*180/3.1415)
-     6       .and.gprott.gt.0.5.and.gprott.lt.0.80) iOK=1 ! bin 3
-          if (iOK.eq.0) return
-        endif
-c
         if(acce16) then
           iOK=daccepte16emcgen()
           if(iOK.eq.1) dvcsgenOK=.TRUE.  ! write only e16 acceptance
@@ -1403,27 +1208,28 @@ c
         return
         end
 c
-        subroutine fillevent(j,p,k)
-        implicit none
+         subroutine write2hbook(part)
+c      implicit none
+#include "bcs.inc"
 #include "dvcs.inc"
 #include "dvcsmom.inc"
 #include "ntupgdvcs.inc"
-        integer j,k(4000,5)
-        real p(4000,5)
-c
-       real el04(4),elf4(4),qiu4(4),pro4(4)
-       integer part,part_id,parent_id,lund2geantid
-       real cx,cy,cz,theta,phi,pmom,pener,px,py,pz
+
+
+
+       real el04(4),elf4(4),pro4(4)
+       integer part,part_id,parent_id
+       real cx,cy,cz,theta,phi,pmom,px,py,pz
        real Azimuthalphi,PolarTheta,anu,gw2,pien
        real pi0x,pi0y,pi0z
-c
-       part_id=lund2geantid(k(j,2))
-       px=p(j,1)
-       py=p(j,2)
-       pz=p(j,3)
-       pmom=sqrt(px*px+py*py+pz*pz)         ! momentum
-       pener=sqrt(p(j,5)*p(j,5)+pmom*pmom)  ! energy
-c
+
+       part_id=iw(part+1)
+       parent_id=iw(part+13)
+       px=rw(part+6)
+       py=rw(part+7)
+       pz=rw(part+8)
+       pmom=sqrt(px*px+py*py+pz*pz)
+
        if(pmom.gt.0) then
         cz=pz/pmom
         cx=px/pmom
@@ -1444,60 +1250,62 @@ c
        SELECT CASE (part_id)  
         CASE (3) ! electron
          gnele=gnele+1
-         if(gnele.eq.1 .or. gelee.lt.pener ) then
-           gelee=pener
-           geleh=heli+10*helpi
-           gelet=theta
-           gelef=phi
-c
-          if(cl_smear.eq.1) call smear(part_id,gelee,gelet,gelef)  ! smear     
-c
+         if(gnele.eq.1 .or. gelee.lt.rw(part+5) ) then
+          gelee=rw(part+5)
+          geleh=iw(part+13)
+          gelet=theta
+          gelef=phi
+
+          if(cl_smear.eq.1) call smear(part_id,gelee,gelet,gelef)  ! smear           
+          gelez=rw(part+4)
+          if(bossmearOK) call smearbos(part,part_id,gelee,gelet,gelef)
           anu=cl_beam_energy-gelee
           gq2=2.*cl_beam_energy*gelee*(1.0-cos(gelet))
           gw2=Mp*Mp+2.0*Mp*anu-gq2
-c
+
           if(gw2.gt.0) then
             gw=sqrt(gw2)
           else
             gw=0
           endif
+
+         pien=sqrt(cl_beam_energy*cl_beam_energy-mele*mele)
+        el04(1)=0
+        el04(2)=0
+        el04(3)=pien
+        el04(4)=cl_beam_energy
 c
-          pien=sqrt(cl_beam_energy*cl_beam_energy-mele*mele)
-          el04(1)=0
-          el04(2)=0
-          el04(3)=pien
-          el04(4)=cl_beam_energy
-c
-          pien=sqrt(gelee*gelee-mele*mele)
-          elf4(1)=pien*sin(gelet)*cos(gelef)
-          elf4(2)=pien*sin(gelet)*sin(gelef)
-          elf4(3)=pien*cos(gelet)
-          elf4(4)=gelee
-          call vdifm(el04,elf4,qiu4,4)
-c         print *,'q2',gq2,vdotm(qiu4,qiu4,4)          
+         pien=sqrt(gelee*gelee-mele*mele)
+        elf4(1)=pien*sin(gelet)*cos(gelef)
+        elf4(2)=pien*sin(gelet)*sin(gelef)
+        elf4(3)=pien*cos(gelet)
+        elf4(4)=gelee
+         call vdifm(el04,elf4,qiu4,4)
+c        print *,'q2',gq2,vdotm(qiu4,qiu4,4)          
           gxb=gq2/2.0/Mp/anu
-        endif 
-c
+         endif 
+
         CASE (14) ! proton
          gnpro=gnpro+1
-         if(gnpro.eq.1 .or. gproe.lt.pener ) then
-          gproe=pener
+         if(gnpro.eq.1 .or. gproe.lt.rw(part+5) ) then
+          gproe=rw(part+5)
           gprot=theta
           gprof=phi
-          if(cl_smear.eq.1) call smear(part_id,gproe,gprot,gprof)  ! smear 
+          if(cl_smear.eq.1) call smear(part_id,gproe,gprot,gprof)  ! smear           
+      if(bossmearOK) call smearbos(part,part_id,gproe,gprot,gprof)
          endif 
-c
+
         CASE (7) ! pi0
-         gnpi0=gnpi0+1
-         if(gnpi0.eq.1 .or. gpi0e.lt.pener ) then
-          gpi0e=pener
+         gpi0u=gpi0u+1
+         if(gnpi0.eq.1 .or. gpi0e.lt.rw(part+5) ) then
+          gpi0e=rw(part+5)
           gpi0t=theta
           gpi0f=phi
          endif 
 
         CASE (1) ! gamma
          gngam=gngam+1
-         if(gngam.eq.1 .or. ggame.lt.pener ) then  ! high energy  gamma-1
+         if(gngam.eq.1 .or. ggame.lt.rw(part+5) ) then  ! write high energy gamma as gamma-1
 c
            if(gngam.gt.1) then   ! if high energy is the second store the first
             ggam2e=ggame
@@ -1505,24 +1313,26 @@ c
             ggam2f=ggamf
            endif
 c
-          ggame=pener
+          ggame=rw(part+5)
           ggamt=theta
           ggamf=phi
-          if(cl_smear.eq.1) call smear(part_id,ggame,ggamt,ggamf)  ! smear 
+          if(cl_smear.eq.1) call smear(part_id,ggame,ggamt,ggamf)  ! smear           
+      if(bossmearOK) call smearbos(part,part_id,ggame,ggamt,ggamf)
          else
-            ggam2e=pener
+            ggam2e=rw(part+5)
             ggam2t=theta
             ggam2f=phi
-          if(cl_smear.eq.1) call smear(part_id,ggam2e,ggam2t,ggam2f)  ! smear 
+          if(cl_smear.eq.1) call smear(part_id,ggam2e,ggam2t,ggam2f)  ! smear           
+      if(bossmearOK) call smearbos(part,part_id,ggam2e,ggam2t,ggam2f)
          endif
          if(gngam.gt.1) then
           gnpi0=1
           gpi0e=ggam2e+ggame
-          pi0x=ggame*sin(ggamt)*cos(ggamf)+ggam2e*sin(ggam2t)*cos(ggam2f)
-          pi0y=ggame*sin(ggamt)*sin(ggamf)+ggam2e*sin(ggam2t)*sin(ggam2f)
-          pi0z=ggame*cos(ggamt)+ggam2e*cos(ggam2t)
-          gpi0f=Azimuthalphi(pi0x,pi0y)
-          gpi0t=PolarTheta(pi0x,pi0y,pi0z)
+          pi0x=game*sin(gamt)*cos(gamf)+gam2e*sin(gam2t)*cos(gam2f)
+          pi0y=game*sin(gamt)*sin(gamf)+gam2e*sin(gam2t)*sin(gam2f)
+          pi0z=game*cos(gamt)+gam2e*cos(gam2t)
+          pi0f=Azimuthalphi(pi0x,pi0y)
+          pi0t=PolarTheta(pi0x,pi0y,pi0z)
          endif
         CASE DEFAULT
 
@@ -1535,18 +1345,13 @@ c
 #include "dvcs.inc"
           integer pid
           real p,e,t,f,rn1,rn2,rn3,rn4,sin6
-          real dts,ps,es,ts,fs,rn(4)
+          real dts,ps,es,ts,fs
            es=e
            ts=t
            fs=f
            sin6=9.6                  ! sin6^o
-           call MYRNORML(rn,4)       ! replacing normal random generator
-c           call rannor(rn1,rn2)
-c           call rannor(rn3,rn4)
-            rn1=rn(1)
-            rn2=rn(2)
-            rn3=rn(3)
-            rn4=rn(4)
+           call rannor(rn1,rn2)
+           call rannor(rn3,rn4)
           if(pid.eq.1) then ! photon separately
            e=es+cl_sme*sqrt(es)*rn1
            t=ts+cl_smf*rn2
@@ -1659,6 +1464,470 @@ c
        RETURN
       END
 
+C***********************************************************************
+      SUBROUTINE CLASBOSEND(recname)
+C***********************************************************************
+          implicit none
+#include "bcs.inc"
+	character*8 recname
+	integer ierr
+        call fwbos(iw,33,'0',ierr)
+c        call bosta
+        call fparm('CLOSE recname')
+
+         print *,'END CLASBOSEND',ierr
+
+      RETURN
+      END     
+
+
+C***********************************************************************
+      SUBROUTINE CLASBOSINIT(recname)
+C***********************************************************************
+      implicit none
+      
+      character*8 recname
+      character*132 ddl_file
+#include "bcs.inc"
+#include "dvcs.inc"
+c
+c       Open BOS input & output files
+c
+      CALL bnames(1000)
+      call bos(iw,nbcs)
+c
+      call revinm ('CLAS_PARMS','clasbanks.ddl',ddl_file)
+      CALL txt2bos(ddl_file) !'clasbanks.ddl')
+
+      close (33)
+
+      call fparm ('OPEN ' //recname// ' UNIT=33 '// 
+     &     'FILE="'//bosout//'"'// 
+     &     ' RECL=32760 ACTION=WRITE STATUS=NEW FORM=BINARY')
+
+      RETURN
+      END     
+
+
+
+
+      SUBROUTINE TXT2BOS(FILENAME)
+c
+c_begin_doc
+c  RCS ID string
+c  $Id: dvcsgen.F,v 1.8 2003/03/14 02:29:14 avakian Exp $
+c
+c  Documentation for subroutine TXT2BOS
+c
+c  Purpose: reads in an ascii file (FILENAME) and converts that info into
+c  -------- BOS bank definition.
+c
+c  Input Parameters:  FILENAME :C*(*): ascii file contain BOS bank definitions
+c  ----------------   Format is as follows:
+c anything following a `*' or a `!' is considered a comment
+c   *   this is a comment, the following is an example bank definition
+c   *   leading blanks are ignored
+C   * the first line should contain a 4 character  NAME followed by
+c   * the name of the bank and ACTION word (CREATE, WRITE, DELETE, MODIFY)
+c   *  TABLE BANKname fmt  ACTION1 ACTION2
+c   * The NAME line is followed by a row ordered list of format statements
+c   * as defined in page 10 of the BOS manual, for example
+c   *           * run and event number 
+c   *           * 2 group of 3 floating points
+c   * 
+c   * ACTION = CREATE implies MKFMT will be called
+c   * ACTION = WRITE implies BLIST(IW,'E+','bname') will be called,
+c   *          absence of WRITE implies BLIST(IW,'E-','bname') will be called
+c   * ACTION = DELETE implies BLIST(IW,'R+','bname') will be called
+c   * ACTION = MODIFY implies THIS definition should OVERRIDE definition in
+c   *                 datafile
+c   * ACTION = DISPLAY implies the bank will be `shipped' to the event store
+c              buffer so that CED can display it
+c
+c  Output Parameters:
+c  -----------------
+c
+c  Other routines:
+c  ---------------
+c
+c  Notes:
+c  ------
+c
+c  Author:   Arne Freyberger      Created:  Fri Oct  6 15:21:23 EDT 1995
+c  -------
+c
+c  Major revisions:
+c  ----------------
+c     
+c
+c_end_doc
+c
+      IMPLICIT NONE
+      SAVE
+c
+c_begin_inc
+c  include files :
+c  ---------------------
+c BOS common block  uncomment the next line for BOS include file
+#include "bcs.inc"
+#include "bnkfmt.inc"
+c                           CLAS control module
+#include "clasmdl.inc"
+c_end_inc
+c
+c_begin_var
+c  input/output variables:
+c  -----------------------
+c
+c  Local pre-defined variables:
+c  ---------------------------
+c  RCS information: 
+      CHARACTER*132  CFILE, CREVIS, CSTATE, CDATE, CAUTHO, CRCSID
+      PARAMETER (CFILE = '$rcsRCSfile$')
+      PARAMETER (CREVIS = '$rcsRevision$')
+      PARAMETER (CSTATE = '$rcsState$')
+      PARAMETER (CDATE = '$rcsDate$')
+      PARAMETER (CAUTHO = '$rcsAuthor$')
+      DATA CRCSID/   
+     1'$Id: dvcsgen.F,v 1.8 2003/03/14 02:29:14 avakian Exp $'   
+     2/   
+c  Module information:
+      CHARACTER*(*)  CRNAME, CRAUTH
+      CHARACTER*100  CRMESS
+      PARAMETER (CRNAME='TXT2BOS')
+      PARAMETER (CRAUTH='Arne Freyberger')
+c
+c  Local User defined variables:
+c  -----------------------------
+      INTEGER   INDEXA, INDEXN
+      EXTERNAL  INDEXA, INDEXN
+      INTEGER ICLOC,  ISCAN, lenocc
+      EXTERNAL ICLOC, ISCAN, lenocc
+      character*132 spaces, strip
+      external spaces, strip
+c
+      CHARACTER*(*) FILENAME
+      character*512 LINE
+      CHARACTER*256 CNAME, CWORD, CTMP
+      CHARACTER*400 BFORMAT
+      CHARACTER*4 BNAME
+      CHARACTER*20 CWORDS(40)
+      character*128  ctest
+      LOGICAL LCREATE, LMODIFY, LWRITE, LDELETE
+      LOGICAL LDONE, LCLEAR, LDISPLAY, LINIT, LFORMAT_DONE
+      INTEGER ILUN, IRET, NLINE
+      INTEGER IN_BEG, IN_END, IFORMAT_BEG, IFORMAT_END, IBEG, IEND
+      INTEGER IBEGA, IBEGN, IEND1, IEND2
+      INTEGER WCNT, IWORDS, ICOLUMN, iretlen
+c_end_var
+      DATA LINIT/.FALSE./
+      DATA BFORMAT/'                              '/
+c
+c  executable code for routine TXT2BOS:
+c----6----------------------------------------------------------------72
+c
+      IF (.NOT. LINIT) THEN
+        LINIT = .TRUE.
+        IDELETE = 0
+        IWRITE = 0
+        IREMOVE = 0
+        ICREATE = 0
+      ENDIF
+
+c open the ascii file
+ 
+      CALL RESLUN(CRNAME,ILUN,IRET)
+      CALL REOPEN(FILENAME,ILUN,'OLD',IRET)
+      if (iret .lt. 0) return
+c 
+      ICOLUMN = 0
+
+c      write(crmess,1002)
+ 1002 format('Bankname : Format',T45,'WRITE DELETE DISPLAY')
+c      call recmes(crname,'i',crmess)
+
+c  do stuff with the file, read in line by line and 
+c  parse each line into words
+
+      LCLEAR = .TRUE.
+10    CONTINUE
+      READ(ILUN,11,ERR=999,END=999)LINE
+11    FORMAT(A512)
+      NLINE = NLINE + 1
+      LINE = SPACES(LINE,1)
+      IF (LINE(1:1) .EQ. '*' .OR. 
+     1    LINE(1:1) .EQ. '!') GOTO 10
+
+c  convert to upper case
+
+      CALL CLTOU(LINE(1:256))
+
+c construct the BOS bank, first break the line into words
+c separated by blanks
+
+      IEND1 = ICLOC('*',1,LINE,1,256)
+      IEND2 = ICLOC('!',1,LINE,1,256)
+      IEND = 256
+      IF (IEND1*IEND2 .NE. 0) THEN
+       IEND = MIN(IEND1,IEND2)
+      ELSE
+       IEND = MAX(IEND1,IEND2)
+      ENDIF
+      IF (IEND .EQ. 0) GOTO 10
+      IBEGA = INDEXA(LINE(1:IEND))
+      IBEGN = INDEXN(LINE(1:IEND))
+      IF (IBEGN*IBEGA .EQ. 0) THEN
+        IBEG = MAX(IBEGA,IBEGN)
+      ELSE
+        IBEG = MIN(IBEGA,IBEGN)
+      ENDIF
+      if (ibeg .eq. 0) goto 10
+      IF (IEND .EQ. 0) IEND = 256
+c
+c  separate the line into words then loop over them
+c
+      CALL REWORD(LINE,IWORDS,CWORDS)
+      IF (IWORDS .LE. 1) GOTO 10
+      CWORD = CWORDS(1)
+      IF (CWORD(1:1) .EQ. '!' .OR. CWORD(1:1) .EQ. '*') GOTO 10
+c
+c  look for TABLE as the START of the bank definition
+c
+      IF (CWORD(1:2) .EQ. 'TA') THEN 
+        IF (.NOT. LCLEAR .and. IFORMAT_END .gt. 1) THEN
+           IN_END = IFORMAT_END - 1
+           iretlen = 1
+           call fmcre(bformat(1:IN_END+2), ctest, iretlen)
+c           WRITE(CRMESS,1001)
+c     1     BNAME,BFORMAT(1:min(23,IFORMAT_END-1)), 
+c     1     BNAME,ctest(1:30), 
+c     2                LWRITE, LDELETE, LDISPLAY
+c           CALL RECMES(' ','N',CRMESS)
+c           IF (LCREATE) THEN
+               if (iretlen.LT.6) then
+                  CALL MKFMT(IW,BNAME,BFORMAT(1:IN_END))
+               else
+                  CALL MKFMT(IW,BNAME,ctest(1:iretlen))
+               endif
+             ICREATE = ICREATE + 1
+             CREATE_NAME(ICREATE) = BNAME
+             CREATE_FORMAT(ICREATE) = BFORMAT(1:IN_END)
+             NCREATE_COL(ICREATE) = ICOLUMN
+c           ENDIF
+           IF (LWRITE) THEN
+              CALL BLIST(IW,'E+',BNAME)
+              IWRITE = IWRITE + 1
+              CBANK_WRITE(1+4*(IWRITE-1):4+4*(IWRITE-1)) = BNAME
+           ELSE
+              CALL BLIST(IW,'E-',BNAME)
+              IREMOVE = IREMOVE + 1
+              CBANK_REMOVE(1+4*(IREMOVE-1):4+4*(IREMOVE-1)) = BNAME
+           ENDIF
+           IF (LDELETE) THEN 
+              CALL BLIST(IW,'R+',BNAME)
+              IDELETE = IDELETE + 1
+              CBANK_DELETE(1+4*(IDELETE-1):4+4*(IDELETE-1)) = BNAME
+           ENDIF
+           IF (LDISPLAY) THEN
+            NBANK_DISPLAY = NBANK_DISPLAY + 1
+            CBANK_DISPLAY(NBANK_DISPLAY) = BNAME
+            CBANK_FORMAT(NBANK_DISPLAY) = BFORMAT(1:IN_END)
+           ENDIF
+           LDONE = .FALSE.
+           LFORMAT_DONE = .FALSE.
+           IFORMAT_END = 0
+           ICOLUMN = 0
+           BNAME = '    '
+           BFORMAT = '                '
+        ENDIF
+
+c  Done writting out previous bank now start over and initialize logicals
+
+        LCLEAR = .FALSE.
+        LCREATE = .FALSE.
+        LDELETE = .FALSE.
+        LWRITE = .FALSE.
+        LMODIFY = .FALSE.
+        LDISPLAY = .FALSE.
+        LFORMAT_DONE = .FALSE.
+
+c BANK name is the SECOND word!!
+
+        BNAME = CWORDS(2)
+c
+        IF (BNAME .NE. '    ') THEN
+c
+        DO 23 WCNT=3,IWORDS
+         CNAME = cwords(wcnt)
+         IF (CNAME(1:3) .EQ. 'B16' .OR.
+     1       CNAME(1:3) .EQ. 'B08' .OR.
+     2       CNAME(1:3) .EQ. 'B32') THEN 
+          BFORMAT = CNAME
+          IFORMAT_END = LENOCC(BFORMAT) + 1
+          LFORMAT_DONE = .TRUE.
+         ELSEIF (CNAME(1:6) .EQ. 'CREATE') THEN
+          LCREATE = .TRUE.
+         ELSEIF (CNAME(1:5) .EQ. 'WRITE') THEN
+          LWRITE = .TRUE.
+         ELSEIF (CNAME(1:6) .EQ. 'DELETE') THEN
+          LDELETE = .TRUE.
+         ELSEIF (CNAME(1:6) .EQ. 'MODIFY') THEN
+          LMODIFY = .TRUE.
+         ELSEIF (CNAME(1:7) .EQ. 'DISPLAY') THEN
+          LDISPLAY = .TRUE.
+         ENDIF
+23      CONTINUE
+        ENDIF
+
+c   check for END or END TABLE presence
+
+      ELSEIF (CWORD(1:3) .EQ. 'END' .AND. BNAME .NE. '    ') THEN
+          LDONE = .TRUE.
+c
+c  the following lines parse the FORMAT lines (not a TAble or END line)
+c
+      ELSEIF (BNAME .NE. '    ') THEN
+         IFORMAT_BEG = IFORMAT_END + 1
+         CNAME = CWORDS(3)
+         IN_END = ISCAN(CNAME,' ') - 1
+         if (in_end .eq. 0) goto 10
+c
+c  reject relational formats
+c
+         IF (CNAME(1:1) .EQ. 'D' .OR.
+     1       CNAME(1:1) .EQ. 'R' .OR.
+     2       CNAME(1:1) .EQ. 'M') GOTO 10
+         ICOLUMN = ICOLUMN + 1
+         ctmp = cwords(2)
+         create_elements(icreate+1,icolumn)= ctmp(1:8)
+         if (.not. lformat_done) then
+          IN_BEG = 1
+          IFORMAT_END = IFORMAT_BEG + IN_END - 1
+          BFORMAT(IFORMAT_BEG:IFORMAT_END) = CNAME(1:IN_END)
+          IFORMAT_END = IFORMAT_END + 1
+          BFORMAT(IFORMAT_END:IFORMAT_END) = ','
+         endif
+       ENDIF
+c
+       IF (LDONE .AND. BNAME .NE. '    ') THEN
+           IN_END = IFORMAT_END - 1
+           CALL MKFMT(IW,BNAME,BFORMAT(1:IN_END))
+           ICREATE = ICREATE + 1
+           CREATE_NAME(ICREATE) = BNAME
+           CREATE_FORMAT(ICREATE) = BFORMAT(1:IN_END)
+           NCREATE_COL(ICREATE) = ICOLUMN
+
+           IF (LWRITE) THEN
+              CALL BLIST(IW,'E+',BNAME)
+              IWRITE = IWRITE + 1
+              CBANK_WRITE(1+4*(IWRITE-1):4+4*(IWRITE-1)) = BNAME
+           ELSE
+              CALL BLIST(IW,'E-',BNAME)
+              IREMOVE = IREMOVE + 1
+              CBANK_REMOVE(1+4*(IREMOVE-1):4+4*(IREMOVE-1)) = BNAME
+           ENDIF
+           IF (LDELETE) THEN 
+              CALL BLIST(IW,'R+',BNAME)
+              IDELETE = IDELETE + 1
+              CBANK_DELETE(1+4*(IDELETE-1):4+4*(IDELETE-1)) = BNAME
+           ENDIF
+           IF (LDISPLAY) THEN
+            NBANK_DISPLAY = NBANK_DISPLAY + 1
+            CBANK_DISPLAY(NBANK_DISPLAY) = BNAME
+            CBANK_FORMAT(NBANK_DISPLAY) = BFORMAT(1:IN_END)
+           ENDIF
+           iretlen = 1
+           call fmcre(bformat, ctest, iretlen)
+c           WRITE(CRMESS,1001)
+c     1     BNAME,BFORMAT(1:min(23,IFORMAT_END-1)), 
+c     1     BNAME,ctest, 
+c     2                LWRITE, LDELETE, LDISPLAY
+ 1001      FORMAT('|',13x,A4,' : ',A30,' : ',T60,3(L1,6X))
+c           CALL RECMES(' ','N',CRMESS)
+           LDONE = .FALSE.
+           LFORMAT_DONE = .FALSE.
+           LCLEAR = .TRUE.
+           IFORMAT_END = 0
+           ICOLUMN = 0
+           BNAME = '    '
+           BFORMAT = '            '
+       ENDIF
+      GOTO 10
+c
+c  but format last bank before exiting
+c
+999   CONTINUE
+      if (.not. lclear) then
+       iretlen = 1
+       call fmcre(bformat, ctest, iretlen)
+c       WRITE(CRMESS,1001)
+c     1     BNAME,BFORMAT(1:min(23,IFORMAT_END-1)), 
+c     1     BNAME,ctest, 
+c     2                LWRITE, LDELETE, LDISPLAY
+c       CALL RECMES(' ','N',CRMESS)
+       if (iretlen.LT.6) then
+          CALL MKFMT(IW,BNAME,BFORMAT(1:IFORMAT_END-1))
+       else
+          CALL MKFMT(IW,BNAME,ctest(1:iretlen))
+       endif
+       ICREATE = ICREATE + 1
+       CREATE_NAME(ICREATE) = BNAME
+       CREATE_FORMAT(ICREATE) = BFORMAT(1:IFORMAT_END-1)
+       NCREATE_COL(ICREATE) = ICOLUMN
+
+       IF (LWRITE) THEN
+           CALL BLIST(IW,'E+',BNAME)
+           IWRITE = IWRITE + 1
+           CBANK_WRITE(1+4*(IWRITE-1):4+4*(IWRITE-1)) = BNAME
+       ELSE
+           CALL BLIST(IW,'E-',BNAME)
+           IREMOVE = IREMOVE + 1
+           CBANK_REMOVE(1+4*(IREMOVE-1):4+4*(IREMOVE-1)) = BNAME
+       ENDIF
+       IF (LDELETE) THEN 
+           CALL BLIST(IW,'R+',BNAME)
+           IDELETE = IDELETE + 1
+           CBANK_DELETE(1+4*(IDELETE-1):4+4*(IDELETE-1)) = BNAME
+       ENDIF
+       IF (LDISPLAY) THEN
+         NBANK_DISPLAY = NBANK_DISPLAY + 1
+         CBANK_DISPLAY(NBANK_DISPLAY) = BNAME
+         CBANK_FORMAT(NBANK_DISPLAY) = BFORMAT(1:IN_END)
+       ENDIF
+c       iretlen = 30
+c       call fmcre(bformat, ctest, iretlen)
+c       WRITE(CRMESS,1001)
+c     1     BNAME,BFORMAT(1:min(23,IFORMAT_END-1)), 
+c     1     BNAME,ctest, 
+c     2                LWRITE, LDELETE, LDISPLAY
+c       CALL RECMES(' ','I',CRMESS)
+       IFORMAT_END = 0
+      endif
+c      write(crmess,1002)
+c      call recmes(crname,'i',crmess)
+      CALL RESLUN(CRNAME,-ILUN,IRET)
+c
+c$$$      call recmes(crname,'i',
+c$$$     1  'The following banks will be DELETED from memory before reading in the next event')
+c$$$      if (idelete .ne. 0) 
+c$$$     1      call recmes(crname,'i',cbank_delete(1:4+4*(IDELETE-1)))
+c$$$      call recmes(crname,'i',
+c$$$     1      'The following banks will NOT be written out')
+c$$$      if (iremove .ne. 0) 
+c$$$     1      call recmes(crname,'i',cbank_remove(1:4+4*(IREMOVE-1)))
+c$$$      call recmes(crname,'i',
+c$$$     1      'The following banks WILL be written out')
+c$$$      if (iwrite .ne. 0) 
+c$$$     1      call recmes(crname,'i',cbank_write(1:4+4*(IWRITE-1)))
+      CLOSE(ILUN)
+      RETURN
+      END
+c
+c$$$c------------------------------------------------------------------------------
+c$$$      COMMON /LUDAT3/MDCY(500,3),MDME(2000,2),BRAT(2000),KFDP(2000,5)      
+c$$$      COMMON/LUDAT1/MSTU(200),PARU(200),MSTJ(200),PARJ(200)
+c$$$      COMMON/LUJETS/N,K(4000,5),P(4000,5),V(4000,5)
+
 C********************************************************************* 
 c
        subroutine vsumm(a,b,c,n)
@@ -1724,7 +1993,7 @@ c
 c
 c
        real function vmass(a)
-       real vm,a(4)
+       real vm
         vm= vdotm(a,a,4)
         if (vm.lt.0.0) then
           vmass=sqrt(-vm)
@@ -1743,18 +2012,31 @@ c
       double precision yb,ymax,ycol
       double precision  xmin1,xmax1
       double precision dsIunp,dsBHlp, dsIlp,dsBHtp,dsItp
+ccc- Hyon-Suk
+      common/radmick/PhRAD
+      real PhRAD(4)
+      common/radhs/radtheta
+      real radtheta
+ccc- Hyon-Suk
+c
 c
       istatus=0                    ! kinematic range OK
-      Ed=cl_be
+      Ed=cl_beam_energy
       E=Ed
+ccc- Hyon-Suk
+c      if((PhRAD(4).gt.0.).and.(radtheta.le.0.15)) E=cl_beam_energy-PhRAD(4)
+ccc- Hyon-Suk
       xmin1 = Q2/(2D0*Mp*E)
       xmax1 = 1D0
       nu  = Q2/(2D0*Mp*xb)
       W2  = Mp**2 + 2D0*Mp*nu - Q2
 c
-      if( xb.lt.xmin1 .or. xb.gt.xmax1 ) istatus=1  !    x  out of range
-      if( Q2.lt.cl_q2min .or. Q2.gt. cl_q2max) istatus=2  !    Q2  out of range
-      yb=nu/Ed
+      if( xb.le.xmin1 .or. xb.gt.xmax1 ) istatus=1  !    x  out of range
+      if( Q2.le.cl_q2min .or. Q2.gt. cl_q2max) istatus=2  !    Q2  out of range
+c      yb=nu/Ed
+ccc- Hyon-Suk
+      yb=nu/E
+ccc- Hyon-Suk
       if(yb.gt.cl_ymax .or. yb.lt.cl_ymin) istatus=3        ! ymin<y<ymax
       if(W2.lt.cl_wmin) istatus=4
 c$$$      call dvcsycol(del2,xb,Q2,ycol)
@@ -1782,14 +2064,24 @@ c
       double precision E, xb, Q2, del2,Phi_e,Phi_g,Phi_s,Phi_gb,dsigma
       double precision nu,W2,W,qmod,E1cm,P1cm,E2cm,P2cm,del2max,del2min
       double precision yb,ymax,ycol
+      integer istat
       double precision  xmin1,xmax1
       double precision dsIunp,dsBHlp, dsIlp,dsBHtp,dsItp
-      real corraul,rP1,rP2
+      double precision temp_th_g
+ccc- Hyon-Suk
+      common/radmick/PhRAD
+      real PhRAD(4)
+      common/radhs/radtheta
+      real radtheta
+ccc- Hyon-Suk
 c
 c
-      istatus=0                    ! kinematic range OK
-c      Ed=cl_be
+      istat=0                    ! kinematic range OK
+      Ed=cl_be
       E=Ed
+ccc- Hyon-Suk
+      if((PhRAD(4).gt.0.).and.(radtheta.le.0.15)) E=cl_be-PhRAD(4)
+ccc- Hyon-Suk
       xmin1 = Q2/(2D0*Mp*E)
       xmax1 = 1D0
       nu  = Q2/(2D0*Mp*xb)
@@ -1804,41 +2096,32 @@ c
       del2max = 2D0*(Mp**2 - E1cm*E2cm - P1cm*P2cm)
       del2min = 2D0*(Mp**2 - E1cm*E2cm + P1cm*P2cm)
 c
-      if( xb.le.xmin1 .or. xb.gt.xmax1 ) istatus=1           !    x  out of range
-      if( del2.ge.del2min .or. del2.le.del2max ) istatus=2   ! delta out of range
-      yb=nu/Ed
-      if( isnan(xb).or.isnan(Q2).or.isnan(del2).or.isnan(Phi_e).or.isnan(Phi_g)) istatus=3          ! y<ymax condition is redundant. if nan is passed from the radgen, skip the loop.
-      if (istatus.gt.0) then
-      dsigma = 0
-      return
-      endif
-
+      if( xb.le.xmin1 .or. xb.gt.xmax1 ) istat=1           !    x  out of range
+      if( del2.ge.del2min .or. del2.le.del2max ) istat=2   ! delta out of range
+c      yb=nu/Ed
+ccc- Hyon-Suk
+      yb=nu/E
+ccc- Hyon-Suk
+      if(yb.gt.cl_ymax) istat=3                               ! y<ymax
       call dvcsycol(del2,xb,Q2,ycol)
+	
+      call getphoton(xb,Q2,del2,phi_e,phi_g)
+      temp_th_g=acos(V3gam(3)/(sqrt(V3gam(1)*V3gam(1)+V3gam(2)*V3gam(2)+V3gam(3)*V3gam(3))))
+      if(acos((v3k2(1)*v3gam(1)+v3k2(2)*v3gam(2)+v3k2(3)*v3gam(3))/(sqrt(V3gam(1)*V3gam(1)+V3gam(2)*V3gam(2)+V3gam(3)*V3gam(3))*sqrt(V3k2(1)*V3k2(1)+V3k2(2)*V3k2(2)+V3k2(3)*V3k2(3)))).lt.0.034) istat=4
+      if(temp_th_g.lt.0.034) istat=4
+c      if( (ycol-yb).le.cl_ycol ) istat=4                   ! y-too big
 
+      if (istat.eq.0) then
       Phi_gb=pi - Phi_g
       Phi_s=Phi_e
-      call bhdvcs(xb,  Q2,  del2,  Phi_s,Phi_gb,rP1,rP2) 
-c
-      if(abs(rP1).le.cl_ycol ) istatus=4                   ! y-too big
-c      if((ycol-yb).le.cl_ycol ) istatus=4                   ! y-too big
-
-      if (istatus.eq.0) then
+      call bhdvcs(xb,  Q2,  del2,  Phi_s,Phi_gb) 
 c
       dsBH =hc0BH +hc1BH*cos(Phi_gb)+hc2BH*cos(2D0*Phi_gb)
       dsDVCS=hc0dvcs+hc1dvcs*cos(Phi_gb)+hs1dvcs*sin(Phi_gb)+hs2dvcs*sin(2*Phi_gb)
       dsIunp=hc0Iunp +heli*hs1Iunp*sin(Phi_gb)+hc1Iunp*cos(Phi_gb) 
      6     +heli*hs2Iunp*sin(2*Phi_gb)+hc2Iunp*cos(2*Phi_gb)
 c      
-c
-c      scale the sin\phi moment
-       dsIunp=dsIunp*cl_scale
-c
-       if(cl_ktcor) then
-         dsIunp=dsIunp*corraul(del2,Q2)     ! correct~20% of A_LU at small t
-       endif
-c
-       dsigma=dsBH
-       if(cl_bh.gt.1)  dsigma=dsigma+dsDVCS-Ich*dsIunp 
+       dsigma=dsBH +dsDVCS-Ich*dsIunp 
 
 c
 c      L-POL
@@ -1870,14 +2153,9 @@ c       print *,'out of limits ',xb,xmin1,xmax1,del2,del2min,del2max,istat
        gwbh=dsBH
        gwdvcs=dsDVCS
        gvint=dsIunp
-c       gsin=hs1Iunp/(hc0BH+hc0dvcs+hc0Iunp)
-       gsin=hs1Iunp/hc0BH
-       gsin2=dsigma
+       gsin=hs1Iunp/(hc0BH+hc0dvcs+hc0Iunp)
+       gsin2=hc0BH+hc0dvcs+hc0Iunp 
         gproh=helpi
-        ghp1=hcp1
-        ghp2=hcp2
-        ghccb=hccb
-        ghcci=hcci
         gh0bh=hc0BH
         gh1bh=hc1BH
         gh2bh=hc2BH
@@ -1893,7 +2171,6 @@ c       gsin=hs1Iunp/(hc0BH+hc0dvcs+hc0Iunp)
         gh1bhlp=hc1bhlp
         ghs1ilp=hs1ilp
         gh1ilp=hc1ilp
-        gh0ilp=hc0ilp
        else if(cl_pol.eq.2) then
         gh0bhtpcos = hc0BHtpcos
         gh1bhtpcos = hc1BHtpcos
@@ -1905,7 +2182,6 @@ c       gsin=hs1Iunp/(hc0BH+hc0dvcs+hc0Iunp)
         gh0itpcos  = hc0Itpcos
         gh0itpsin  = hc0Itpsin
       endif
-c      print *,'bhdvcs rP1= ',rP1,rP2,dsigma,cl_ycol,ycol-yb,xb,Q2,del2
       return
       end
 c
@@ -1918,72 +2194,73 @@ c
       double precision nu,W2,W,qmod,E1cm,P1cm,E2cm,P2cm,del2max,del2min
       double precision yb,ymax,ycol,dpi0u,dpi0l,dpi0t,sinpi0
       double precision  xmin1,xmax1,skew
-      real HTre2,UFx,PFxq2,Tfac,u,aac2s0,dubbs,ddbbs,rskew
-      real tt,tQ2,A1_PHI,A2_PHI,BT_Q2
-
+      real HTre2,UFx,PFxq2,Tfac,u,aac2s0
+      integer istat
+ccc- Hyon-Suk
+      common/radmick/PhRAD
+      real PhRAD(4)
+      common/radhs/radtheta
+      real radtheta
+ccc- Hyon-Suk
 c
 c
-      istatus=0                    ! kinematic range OK
+      istat=0                    ! kinematic range OK
+ccc- Hyon-Suk
+      Ed=cl_be
+ccc- Hyon-Suk
       E=Ed
+ccc- Hyon-Suk
+      if((PhRAD(4).gt.0.).and.(radtheta.le.0.15)) E=cl_be-PhRAD(4)
+ccc- Hyon-Suk
       xmin1 = Q2/(2D0*Mp*E)
       xmax1 = 1D0
       nu  = Q2/(2D0*Mp*xb)
       W2  = Mp**2 + 2D0*Mp*nu - Q2
       W   = sqrt(W2)
       qmod = sqrt(nu**2 + Q2)
-      tt=-del2
-      tQ2=Q2
 c
       E1cm = Mp*(Mp + nu)/W
       P1cm = Mp*qmod/W
-      E2cm = (W2 + Mp**2 - mpi0**2)/(2D0*W)     ! vpk noticed
+      E2cm = (W2 + Mp**2)/(2D0*W)
       P2cm = (W2 - Mp**2)/(2D0*W)
       del2max = 2D0*(Mp**2 - E1cm*E2cm - P1cm*P2cm)
       del2min = 2D0*(Mp**2 - E1cm*E2cm + P1cm*P2cm)
 c
-      if( xb.le.xmin1 .or. xb.gt.xmax1 ) istatus=1           !    x  out of range
-      if( del2.ge.del2min .or. del2.le.del2max ) istatus=2   ! delta out of range
-      yb=nu/Ed
+      if( xb.le.xmin1 .or. xb.gt.xmax1 ) istat=1           !    x  out of range
+      if( del2.ge.del2min .or. del2.le.del2max ) istat=2   ! delta out of range
+c      yb=nu/Ed
+ccc- Hyon-Suk
+      yb=nu/E
+ccc- Hyon-Suk
       if(W2.lt.cl_wmin) print *,'Debiles lriv!!!!!!!!!',W2
-      if (istatus.eq.0) then
+      if (istat.eq.0) then
 c
        sinpi0=2*xb*(1-xb)**5
-c       PFxq2=(1-xb)**2/(Mp*Mp*xb/Q2+1-xb)**2
-       PFxq2=84*xb*xb*xb*(1-xb) !(1-xb)**2/(Mp*Mp*xb/Q2+1-xb)**2
-c       Tfac=exp(4*(del2-del2min))
-cccc before 1/10/07       Tfac=exp(cl_bpi0*(del2-del2min))
-        Tfac=exp(BT_Q2(tQ2)*(del2)) !-del2min))   ! from vpk
-c
+       PFxq2=(1-xb)**2/(Mp*Mp*xb/Q2+1-xb)**2
+       Tfac=exp(4*(del2-del2min))
 c
 c      aac2s0(xb,Q2)-leading order pdf from http://spin.riken.bnl.gov/aac/ (hep-ph/0001046)
 c
        skew= xb/(2.0 - xb)
-c       UFx=aac2s0(skew,Q2) !HTre2(xb,del2min) !(du(xi)-dd(xi))**2
-       rskew=xb !skew
-       UFx=(2*dubbs(rskew)+ddbbs(rskew))**2
+       UFx=aac2s0(skew,Q2) !HTre2(xb,del2min) !(du(xi)-dd(xi))**2
        dpi0u=0.3*Tfac*UFx*PFxq2
-ccc before 1/10/07       dpi0u=dpi0u/Q2/Q2/(Q2+Mp**2)**2*(1.0+sinpi0*heli*sin(Phi_g)) 
-       dpi0u=dpi0u/Q2/Q2/(Q2+Mp**2)**2*    ! vpk
-     6(1.0+A1_PHI(tt)*cos(Phi_g)+A2_PHI(tt)*cos(2*Phi_g)
-     6    +sinpi0*heli*sin(Phi_g))
+       dpi0u=dpi0u/Q2/(Q2+Mp**2)**2*(1.0+sinpi0*heli*sin(Phi_g))
        dsigma=dpi0u
 c       print *,xb,u(xb)*xb,UFx,(u(xb)*xb)**2,UFx/(u(xb)*xb)**2
 c       print *,'exc->',smax,q2,del2,'->',xb,PFxq2,UFx,dsigma
 c
 c      L-POL
 c
-c       print *,'------',cl_pol,dsigma
-c
        if(cl_pol.eq.1) then 
-        dpi0l=6*xb*xb*(1-xb)**5*helpi*sin(Phi_g) !????    ! longpol
-        dsigma=dsigma*(1.0+dpi0l)
+        dpi0l=0 !????    ! longpol
+        dsigma=dsigma+dpi0l
        endif
 c
 c      T-POL
 c 
        if(cl_pol.eq.2) then 
          dpi0t=0 !???? ! tpol
-         dsigma=dsigma*(1.0+dpi0t)
+         dsigma=dsigma+dpi0t
        endif
 c
       else
@@ -2098,7 +2375,7 @@ c
       end
 c
 c
-      subroutine bhdvcs(xbd, Q2d, del2d, phield, phigd,rP1,rP2)
+      subroutine bhdvcs(xbd, Q2d, del2d, phield, phigd)
       implicit double precision (A-H,O-Z)
 #include "dvcsmom.inc"
 #include "dvcs.inc"
@@ -2125,9 +2402,8 @@ C                            BH, DVCS and interf. terms
       parameter ( alpha = 1D0/137.036D0, hc2  = 0.38938D0)
       parameter ( coeff = 1D+9*hc2*alpha**3 )
 c
-      real rP1,rP2
       double precision nu, k1pl, k2pl, Kfac, Jfac
-      common/todvcs/ xb, yb, Q2, del2, del2min,phip,phipel,P1,P2,Kfac,Jfac,ds
+      common/todvcs/ xb, yb, Q2, del2, del2min,phip,phipel,P1,P2,Kfac,ds
 *
       common/formfac/ F1pn(2), F2pn(2)
 *
@@ -2160,11 +2436,7 @@ c
       phip = phigd 
       phipel = phield 
 *
-      if (cl_global) then
-      call nuclFF_YAHL( del2d )
-      else
       call nuclFF( del2d )
-      endif
 *
       y1eps=1D0 - yb - yb*yb*eps2/4D0
       sqy1eps=sqrt(y1eps)
@@ -2176,8 +2448,6 @@ c
      *       (1D0 - xbd)*(2D0 - yb)*del2q2
       P1 = -(Jfac + 2D0*Kfac*cos(phip))/(yb*(1D0 + eps2))
       P2 = 1D0 + del2q2 - P1
-      rP1=P1
-      rP2=P2
 c
         if( Ivar.eq.1 .or. Ivar.eq.3 ) then   
        F1 = F1pn(Ipn)
@@ -2214,8 +2484,8 @@ c
       c0_BHlp=c01_BHlp*c02_BHlp*F1_P_F+c03_BHlp*c04_BHlp*F1_M_F
       c0_BHlp=c0_BHlp*(2D0-yb)*bhkin1
 c
-      c11_BHlp=(2D0*tau-xbd*del2q2m1)*(1D0-xbd+xbd*del2q2)  
-      c12_BHlp=1D0+xbd-(3D0-2D0*xbd)*(1D0+xbd*del2q2)-xtau*(1D0+del2q4)
+      c11_BHlp=2D0*tau-xbd*del2q2m1*(1D0-xbd+xbd*del2q2)
+      c12_BHlp=1D0+xbd-(3D0-2D0*xbd)*(1D0+xbd*del2q2)-xtau*(1D0-del2q4)
       c1_BHlp=c11_BHlp*F1_P_F+c12_BHlp*F1_M_F
       c1_BHlp=-c1_BHlp*Kfac*bhkin1
 c
@@ -2241,17 +2511,10 @@ c
       s1_BHtpsin=s11_BHtpsin*s12_BHtpsin
 c
        BHfact=ds/((xbd*yb*(1D0 + eps2))**2*del2d*P1*P2)
-       hcP1=P1
-       hcP2=P2
-       hccb=BHfact
        hc0BH=c0_BH*BHfact
+       gh1dvcs=c0_BH                    !temporary
        hc1BH=c1_BH*BHfact
        hc2BH=c2_BH*BHfact
-c
-       ac0bh=c0_BH
-       ac1bh=c1_BH
-       ac2bh=c2_BH
-c
 c
        hc0BHlp=c0_BHlp*BHfact
        hc1BHlp=c1_BHlp*BHfact
@@ -2273,21 +2536,25 @@ c
       implicit double precision (A-H,O-Z)
 #include "dvcs.inc"
 #include "dvcsmom.inc"
-      double precision Kfac,Jfac,Intfac
-      common/todvcs/ x, y,Q2,del2,del2min,phip,phipel,P1,P2,Kfac,Jfac,ds
+      double precision Kfac,Intfac
+      common/todvcs/ xb, yb, Q2, del2, del2min,phip,phipel,P1,P2,Kfac,ds
       common/formfac/ F1pn(2), F2pn(2)
 c
-      skew = x/(2D0 - x)
-      if(IGPD.lt.100) then
+      skew = xb/(2D0 - xb)
       call amptab(skew, del2, 
      &             H1_RE, H1_IM, H1T_RE, H1T_IM,
      &             E1_RE, E1_IM, E1T_RE, E1T_IM )
-      else
-      call amptabgag(skew, del2, 
-     &             H1_RE, H1_IM, H1T_RE, H1T_IM,
-     &             E1_RE, E1_IM, E1T_RE, E1T_IM )
-      endif
 *
+     
+c	H1_RE=H1_RE*(1.-del2*10.)
+c	H1_IM=H1_IM*(1.-del2*10.)
+c	H1T_RE=H1T_RE*(1.-del2*10.)
+c	H1T_IM=H1T_IM*(1.-del2*10.)
+c       E1_RE=E1_RE*(1.-del2*10.)
+c	E1_IM=E1_IM*(1.-del2*10.)
+c	E1T_RE=E1T_RE*(1.-del2*10.)
+c	E1T_IM=E1T_IM*(1.-del2*10.)
+
 C         proton/neutron
       F1 = F1pn(Ipn)
       F2 = F2pn(Ipn)
@@ -2297,9 +2564,8 @@ C         proton/neutron
       del2m2    = -del2/Mp**2
       del2m4    = -del2m2/4D0
       delm2_sq  = sqrt(del2m2)
-      cy2   = 2D0 - 2D0*y + y**2
-      Intfac=ds/(x*y**3*P1*P2*(-del2))
-      hcci=Intfac
+      cy2   = 2D0 - 2D0*yb + yb**2
+      Intfac=ds/(xb*yb**3*P1*P2*(-del2))
 *
 C  DVCS
 C     
@@ -2308,94 +2574,88 @@ C
      &         H1T_RE*E1T_RE + H1T_IM*E1T_IM )
       a3 =  E1_RE**2 +  E1_IM**2
       a4 = E1T_RE**2 + E1T_IM**2 
-      C_DVCS = ( 4D0*(1D0-x)*a1 - a2*x**2 - (x**2 + (2D0-x)**2*del2m4)*a3 
-     &           - x**2*del2m4*a4 )/(2D0 - x)**2
-      C_DVCS_eff = -x*C_DVCS
+      C_DVCS = ( 4D0*(1D0-xb)*a1 - a2*xb**2 - (xb**2 + (2D0-xb)**2*del2m4)*a3 
+     &           - xb**2*del2m4*a4 )/(2D0 - xb)**2
+      C_DVCS_eff = -xb*C_DVCS
       c0_DVCS = 2D0*cy2*C_DVCS
-      c1_DVCS = 8D0*((2D0 - y)/(2D0 - x))*C_DVCS_eff
-      T_DVCS  = (c0_DVCS + Kfac*c1_DVCS*cos(phip))/(y**2*Q2)
-      DVCSfac=ds/(y**2*Q2)
+      c1_DVCS = 8D0*((2D0 - yb)/(2D0 - xb))*C_DVCS_eff
+      T_DVCS  = (c0_DVCS + Kfac*c1_DVCS*cos(phip))/(yb**2*Q2)
+      DVCSfac=ds/(yb**2*Q2)
       hc0dvcs=c0_DVCS*DVCSfac
       hc1dvcs=Kfac*c1_DVCS*DVCSfac
-      ac0dvcs=c0_DVCS
-      ac1dvcs=Kfac*c1_DVCS
 C
 C  INTERF
 C
-      C_I_re = F1*H1_RE + x/(2D0-x)*(F1+F2)*H1T_RE - del2m4*F2*E1_RE
-      C_I_im = F1*H1_IM + x/(2D0-x)*(F1+F2)*H1T_IM - del2m4*F2*E1_IM
-      RE2    = x/(2D0-x)*(H1_RE + E1_RE) + H1T_RE
-      C_I_re_eff = -x*C_I_re
-      C_I_im_eff = -x*C_I_im
-      b1 = (2D0 - x)*(1D0 - y) 
-      b1= b1 + (2D0-y)**2/(1D0-y)*Kfac*Kfac/del2*Q2 ! old - (1D0 - x)*(2D0 - y)**2*deldel
-      b2 = (1D0 - y)*x*(F1 + F2)
-      c0_I = -8D0*(2D0 - y)*( b1*C_I_re - b2*RE2 )
+      C_I_re = F1*H1_RE + xb/(2D0-xb)*(F1+F2)*H1T_RE - del2m4*F2*E1_RE
+      C_I_im = F1*H1_IM + xb/(2D0-xb)*(F1+F2)*H1T_IM - del2m4*F2*E1_IM
+      RE2    = xb/(2D0-xb)*(H1_RE + E1_RE) + H1T_RE
+      C_I_re_eff = -xb*C_I_re
+      C_I_im_eff = -xb*C_I_im
+      b1 = (2D0 - xb)*(1D0 - yb) 
+      b1= b1 + (2D0-yb)**2/(1D0-yb)*Kfac*Kfac/del2*Q2 ! old - (1D0 - xb)*(2D0 - yb)**2*deldel
+      b2 = (1D0 - yb)*xb*(F1 + F2)
+      c0_I = -8D0*(2D0 - yb)*( b1*C_I_re - b2*RE2 )
       c1_I = -8D0*cy2*C_I_re
-      s1_I =  8D0*y*(2D0 - y)*C_I_im
-      c2_I = -16D0*((2D0 - y)/(2D0 - x))*C_I_re_eff
-      s2_I =  16D0*(y/(2D0 - x))*C_I_im_eff
-c
+      s1_I =  8D0*yb*(2D0 - yb)*C_I_im
+      c2_I = -16D0*((2D0 - yb)/(2D0 - xb))*C_I_re_eff
+      s2_I =  16D0*(yb/(2D0 - xb))*C_I_im_eff
 c
 C     moments
 c
       hs2Iunp=Kfac*Kfac*s2_I*Intfac
       hs1Iunp=Kfac*s1_I*Intfac
+      ghs1dvcs=Kfac*s1_I                      !temporary
       hc2Iunp=Kfac*Kfac*c2_I*Intfac
       hc1Iunp=Kfac*c1_I*Intfac
       hc0Iunp=del2/Q2*c0_I*Intfac
-c
-      ac0int=del2/Q2*c0_I
-      ac1int=Kfac*c1_I
-      as1int=Kfac*s1_I
 c
 c      print *,'mysl-dvcs',hs1Iunp,hc1Iunp,hc0Iunp
 C
 C  LPOL
 C
-      C_LP_re = (F1+F2)*skew*(H1_RE+x/2D0*E1_RE)+
-     6          F1*H1T_RE-skew*(x/2D0*F1+del2m4*F2)*E1T_RE
+      C_LP_re = (F1+F2)*skew*(H1_RE+xb/2D0*E1_RE)+
+     6          F1*H1T_RE-skew*(xb/2D0*F1+del2m4*F2)*E1T_RE
 c
 c
-      C_LP_im = (F1+F2)*skew*(H1_IM+x/2D0*E1_IM)+
-     6          F1*H1T_IM-skew*(x/2D0*F1+del2m4*F2)*E1T_IM
+      C_LP_im = (F1+F2)*skew*(H1_IM+xb/2D0*E1_IM)+
+     6          F1*H1T_IM-skew*(xb/2D0*F1+del2m4*F2)*E1T_IM
 c
-      DC_LP_re=-skew*(F1+F2)*(H1_RE+x/2D0*E1_RE+skew
-     6*(H1T_RE+x/2D0*E1T_RE))
-      DC_LP_im=-skew*(F1+F2)*(H1_IM+x/2D0*E1_IM+skew
-     6*(H1T_IM+x/2D0*E1T_IM))
+      DC_LP_re=-skew*(F1+F2)*(H1_RE+xb/2D0*E1_RE+skew
+     6*(H1T_RE+xb/2D0*E1T_RE))
+      DC_LP_im=-skew*(F1+F2)*(H1_IM+xb/2D0*E1_IM+skew
+     6*(H1T_IM+xb/2D0*E1T_IM))
 c
-      yf2=(2D0-y)**2/(1D0-y)+2
-      c0lp_I =-8*y*(Kfac**2*yf2*C_LP_re+(1D0-y)*(2D0-x)*del2/Q2
+      yf2=(2D0-yb)**2/(1D0-yb)+2
+      c0lp_I =-8*yb*(Kfac**2*yf2*C_LP_re+(1D0-yb)*(2D0-xb)*del2/Q2
      6        *(DC_LP_re+C_LP_re))
       s1lp_I = 8*Kfac*cy2*C_LP_im
-      c1lp_I = -8*Kfac*y*(2D0-y)*C_LP_re
+      c1lp_I = -8*Kfac*yb*(2D0-yb)*C_LP_re
 
 C
 C  TPOL
 C
-      xb2=x*skew
-      C_TPP_re_s = (F1+F2)*(xb2*(H1_RE+x/2D0*E1_RE)+x*del2m4*E1_RE)
-     6          -xb2*F1*(H1T_RE+x/2D0*E1T_RE)
-      C_TPP_re_b1 =del2m4*4D0*(1D0-x)/(2D0-x)*F2*H1T_RE
-      C_TPP_re_b21 =-del2m4*x*F1*E1T_RE
+      xb2=xb*skew
+      C_TPP_re_s = (F1+F2)*(xb2*(H1_RE+xb/2D0*E1_RE)+xb*del2m4*E1_RE)
+     6          -xb2*F1*(H1T_RE+xb/2D0*E1T_RE)
+      C_TPP_re_b1 =del2m4*4D0*(1D0-xb)/(2D0-xb)*F2*H1T_RE
+      C_TPP_re_b21 =-del2m4*xb*F1*E1T_RE
       C_TPP_re_b22 =-del2m4*xb2*F2*E1T_RE
       C_TPP_re_b =C_TPP_re_b1+C_TPP_re_b21+C_TPP_re_b22
 c
-      C_TPP_im_s = (F1+F2)*(xb2*(H1_IM+x/2D0*E1_IM)+x*del2m4*E1_IM)
-     6          -xb2*F1*(H1T_IM+x/2D0*E1T_IM)
-      C_TPP_im_b =del2m4*(4D0*(1D0-x)/(2D0-x)*F2*H1T_IM
-     6            -(x*F1+xb2*F2)*E1T_IM)
+      C_TPP_im_s = (F1+F2)*(xb2*(H1_IM+xb/2D0*E1_IM)+xb*del2m4*E1_IM)
+     6          -xb2*F1*(H1T_IM+xb/2D0*E1T_IM)
+      C_TPP_im_b =del2m4*(4D0*(1D0-xb)/(2D0-xb)*F2*H1T_IM
+     6            -(xb*F1+xb2*F2)*E1T_IM)
 c
 c
 c
-      C_TPM_re_s = 1D0/(2D0-x)*(x*x*F1-(1D0-x)*4D0*del2m4*F2)*H1_RE
+      C_TPM_re_s = 1D0/(2D0-xb)*(xb*xb*F1-(1D0-xb)*4D0*del2m4*F2)*H1_RE
      6          -xb2*(F1+F2)*(H1T_RE+del2m4*E1T_RE)
-      C_TPM_re_b = (del2m4*((2D0-x)*F1+xb2*F2) +xb2*F1)*E1_RE
+      C_TPM_re_b = (del2m4*((2D0-xb)*F1+xb2*F2) +xb2*F1)*E1_RE
 c
-      C_TPM_im_s = 1D0/(2D0-x)*(x*x*F1-(1D0-x)*4D0*del2m4*F2)*H1_IM
+      C_TPM_im_s = 1D0/(2D0-xb)*(xb*xb*F1-(1D0-xb)*4D0*del2m4*F2)*H1_IM
      6          -xb2*(F1+F2)*(H1T_IM+del2m4*E1T_IM)
-      C_TPM_im_b = (del2m4*((2D0-x)*F1+xb2*F2) +xb2*F1)*E1_IM
+      C_TPM_im_b = (del2m4*((2D0-xb)*F1+xb2*F2) +xb2*F1)*E1_IM
 c
 c
       C_TPM_re=C_TPM_re_s+C_TPM_re_b
@@ -2405,23 +2665,23 @@ c
 c
 c
 c
-      DC_TPP_re=-4D0*del2m4*(F2*H1T_RE-x/(2D0-x)*(F1+x/2D0*F2)*E1T_RE)
+      DC_TPP_re=-4D0*del2m4*(F2*H1T_RE-xb/(2D0-xb)*(F1+xb/2D0*F2)*E1T_RE)
       DC_TPM_re=4D0*del2m4*(F2*H1_RE-F1*E1_RE)
 c
-      DC_TPP_im=-4D0*del2m4*(F2*H1T_IM-x/(2D0-x)*(F1+x/2D0*F2)*E1T_IM)
+      DC_TPP_im=-4D0*del2m4*(F2*H1T_IM-xb/(2D0-xb)*(F1+xb/2D0*F2)*E1T_IM)
       DC_TPM_im=4D0*del2m4*(F2*H1_IM-F1*E1_IM)
 c
 c
 c
-      qm8=8D0*Mp*sqrt(1D0-y)/sqrt(Q2)
-      c0tpcos_I = -qm8*Kfac*y*(((2D0-y)**2/(1D0-y)+2D0)*C_TPP_re+DC_TPP_re)
-      c0tpsin_I = qm8*Kfac*(2D0-y)*((2D0-y)**2/(1D0-y)*C_TPM_im+DC_TPM_im)
+      qm8=8D0*Mp*sqrt(1D0-yb)/sqrt(Q2)
+      c0tpcos_I = -qm8*Kfac*yb*(((2D0-yb)**2/(1D0-yb)+2D0)*C_TPP_re+DC_TPP_re)
+      c0tpsin_I = qm8*Kfac*(2D0-yb)*((2D0-yb)**2/(1D0-yb)*C_TPM_im+DC_TPM_im)
 c
-      c1tpcos_I = -qm8*y*(2D0-y)*C_TPP_re
+      c1tpcos_I = -qm8*yb*(2D0-yb)*C_TPP_re
       c1tpsin_I = qm8*cy2*C_TPM_im
 c
       s1tpcos_I = qm8*cy2*C_TPP_im
-      s1tpsin_I = -qm8*y*(2D0-y)*C_TPM_re
+      s1tpsin_I = -qm8*yb*(2D0-yb)*C_TPM_re
 
       hc0Itpcos = c0tpcos_I*Intfac
       hc0Itpsin = c0tpsin_I*Intfac
@@ -2444,72 +2704,14 @@ c
 #include "dvcsmom.inc"
 c
       skew = x/(2D0 - x)
-      if(IGPD.lt.100) then
       call amptab(skew, del2, 
      &             H1_RE, H1_IM, H1T_RE, H1T_IM,
      &             E1_RE, E1_IM, E1T_RE, E1T_IM )
-      else
-      call amptabgag(skew, del2, 
-     &             H1_RE, H1_IM, H1T_RE, H1T_IM,
-     &             E1_RE, E1_IM, E1T_RE, E1T_IM )
-      endif
 C
       HTre2 = H1T_RE*H1T_RE+ H1T_IM*H1T_IM
       return
       end
 
-      subroutine amptabgag(skew, del2, 
-     &                   H1_RE, H1_IM, H1T_RE, H1T_IM,
-     &                   E1_RE, E1_IM, E1T_RE, E1T_IM )
-#include "dvcs.inc"
-c
-      REAL xi
-      REAL mt
-      REAL cff_re
-      REAL cff_im
-      REAL v_re,v_im
-c
-      double precision skew, del2, H1_RE, H1_IM, H1T_RE, H1T_IM,
-     &                             E1_RE, E1_IM, E1T_RE, E1T_IM 
-      double precision F1pn(2), F2pn(2)
-      common/formfac/ F1pn, F2pn
-      real mpi/0.1396/
-      data init/1/
-c
-      SAVE
-c
-      if( init .eq. 1 ) then
-        init = 0
-        call GPD_Init(IGPD-100)
-      endif
-*
-      F1u = 2D0*F1pn(1) + F1pn(2)
-      F1d = 2D0*F1pn(2) + F1pn(1)
-      F2u = 2D0*F2pn(1) + F2pn(2)
-      F2d = 2D0*F2pn(2) + F2pn(1)
-c
-      xi=skew
-      mt=-del2
-      v_re = GPD_GET_CFF(xi,mt,0)
-      v_im = GPD_GET_CFF(xi,mt,3)
-      H1_RE=-v_re
-      H1_IM=-v_im
-      v_re = GPD_GET_CFF(xi,mt,1)
-      v_im = GPD_GET_CFF(xi,mt,4)
-      H1T_RE=-v_re
-      H1T_IM=-v_im
-      v_re = GPD_GET_CFF(xi,mt,2)
-      v_im = GPD_GET_CFF(xi,mt,5)
-      E1_RE=-v_re
-      E1_IM=-v_im
-      E1T_IM=0
-      E1T_RE=0
-c
-      return
-      end
-c
-c
-c
       subroutine amptab(skew, del2, 
      &                   H1_RE, H1_IM, H1T_RE, H1T_IM,
      &                   E1_RE, E1_IM, E1T_RE, E1T_IM )
@@ -2533,8 +2735,6 @@ c
 *
       real mpi/0.1396/
       data init/1/
-      real  h1uimag,h1dimag,h1tuimag,h1tdimag
-      common /h1imag/h1uimag,h1dimag,h1tuimag,h1tdimag
 *
       SAVE
 *
@@ -2627,18 +2827,12 @@ c
 *
         if( Ipn .eq. 1 ) then
           if( IGPD .le. 5 ) then
-      h1uimag=(F1u/2D0)*h1uim
-      h1dimag=(F1d/2D0)*h1dim
       H1_RE = (4D0*(F1u/2D0)*h1ure + F1d*h1dre)/9D0
       H1_IM = (4D0*(F1u/2D0)*h1uim + F1d*h1dim)/9D0
           else
-      h1uimag=h1uim
-      h1dimag=h1dim
       H1_RE = (4D0*h1ure + h1dre)/9D0
       H1_IM = (4D0*h1uim + h1dim)/9D0
           endif
-      h1tuimag=gAu*h1tuim
-      h1tdimag=gAd*h1tdim
       H1T_RE = (4D0*gAu*h1ture + gAd*h1tdre)/9D0
       H1T_IM = (4D0*gAu*h1tuim + gAd*h1tdim)/9D0
       E1_RE = (4D0*(F2u/2D0)*e1ure + F2d*e1dre)/9D0
@@ -2656,7 +2850,7 @@ c
       E1T_IM = ha*(4D0*e1tdim + e1tuim)/9D0
         endif
 *
-      return
+	return
       end
 
       subroutine rtable
@@ -2676,13 +2870,8 @@ c
 *
       common/retbl1/ vh1urenf(51,21,2), vh1drenf(51,21,2) 
       common/imtbl1/ vh1uimnf(51,21,2), vh1dimnf(51,21,2)
-      character*500  pdffile,clasdvcspdf
 * 
-      call getenv('CLASDVCS_PDF',clasdvcspdf)
-       print *,'READING the gpd.dat from directory $CLASDVCS_PDF='
-     6,trim(clasdvcspdf)
-       write(pdffile,'(A,A)') trim(clasdvcspdf),'/gpd.dat'
-      open(unit=11,file=pdffile,status='old')
+      open(unit=11,file='gpd.dat',status='old')
       do i = 1,51
         read(11,101) vh1ure(i,1),vh1dre(i,1),vh1ture(i,1),vh1tdre(i,1),
      &               ve1ture(i,1),ve1tdre(i,1) 
@@ -2755,8 +2944,8 @@ c
  101  format(6e12.4)
  102  format(4e12.4)
  103  format(2e12.4)
-      return
-      end
+	return
+	      end
 
       subroutine nuclFF( del2 )
 C
@@ -2766,7 +2955,7 @@ C
 #include "dvcs.inc"
       common/formfac/ F1pn(2), F2pn(2)
       double precision Mv, kp, kn
-      parameter (Mv = 0.843D0, kp = 1.79285D0, kn = -1.91D0)
+      parameter (Mv = 0.84D0, kp = 1.79D0, kn = -1.91D0)
 C
       dipol = 1D0/(1D0 - del2/Mv**2)**2
 *
@@ -2783,55 +2972,6 @@ C
       F2pn(2) = (GM_n - GE_n)/(1D0-delm)         
       return
       end
-
-      subroutine nuclFF_YAHL( del2 )
-C from the supplementary material of
-C Zhihong Ye, John R. Arrington, Richard J.Hill and Gabriel Lee 
-C "Proton and neutron electromagnetic form factors and uncertainties"
-C Phys. Lett. B 777 (2018) 8--15
-C doi: 10.1016/j.physletb.2017.11.023
-C
-C added by Sangbaek Lee
-C
-C
-      implicit double precision (A-H,O-Z)
-#include "dvcs.inc"
-      common/formfac/ F1pn(2), F2pn(2)
-      double precision Mv, kp, mu_n
-      double precision z, a0(4), a1(4), a2(4), a3(4), a4(4), a5(4), a6(4), a7(4), a8(4), a9(4), a10(4), a11(4), a12(4)
-      parameter (Mv = 0.843D0, kp = 1.79285D0, mu_n = -1.91D0, tcut = 4*0.13957**2, t0 = -0.7)
-C
-      dipol = 1D0/(1D0 - del2/Mv**2)**2
-      z = (sqrt(tcut-del2)-sqrt(tcut-t0))/(sqrt(tcut-del2)+sqrt(tcut-t0)) 
-*
-      a0 = (/ 0.239163298067, 0.264142994136, 0.048919981379, 0.257758326959 /)
-      a1 = (/ -1.109858574410, -1.095306122120, -0.064525053912, -1.079540642058 /)
-      a2 = (/ 1.444380813060, 1.218553781780, -0.240825897382, 1.182183812195 /)
-      a3 = (/ 0.479569465603, 0.661136493537, 0.392108744873, 0.711015085833 /)
-      a4 = (/ -2.286894741870, -1.405678925030, 0.300445258602, -1.348080936796 /)
-      a5 = (/ 1.126632984980, -1.356418438880, -0.661888687179, -1.662444025208 /)
-      a6 = (/ 1.250619843540, 1.447029155340, -0.175639769687, 2.624354426029 /)
-      a7 = (/ -3.631020471590, 4.235669735900, 0.624691724461, 1.751234494568 /)
-      a8 = (/ 4.082217023790, -5.334045653410, -0.077684299367, -4.922300878888 /)
-      a9 = (/ 0.504097346499, -2.916300520960, -0.236003975259, 3.197892727312 /)
-      a10 = (/ -5.085120460510, 8.707403067570, 0.090401973470, -0.712072389946 /)
-      a11 = (/ 3.967742543950, -5.706999943750, 0.0, 0.0 /)
-      a12 = (/ -0.981529071103, 1.280814375890, 0.0, 0.0 /)
-
-      GE_p = (a0(1)*z**0+a1(1)*z**1+a2(1)*z**2+a3(1)*z**3+a4(1)*z**4+a5(1)*z**5+a6(1)*z**6+a7(1)*z**7+a8(1)*z**8+a9(1)*z**9+a10(1)*z**10+a11(1)*z**11+a12(1)*z**12)
-      GM_p = (1D0 + kp)*(a0(2)*z**0+a1(2)*z**1+a2(2)*z**2+a3(2)*z**3+a4(2)*z**4+a5(2)*z**5+a6(2)*z**6+a7(2)*z**7+a8(2)*z**8+a9(2)*z**9+a10(2)*z**10+a11(2)*z**11+a12(2)*z**12)
-      GE_n = (a0(3)*z**0+a1(3)*z**1+a2(3)*z**2+a3(3)*z**3+a4(3)*z**4+a5(3)*z**5+a6(3)*z**6+a7(3)*z**7+a8(3)*z**8+a9(3)*z**9+a10(3)*z**10+a11(3)*z**11+a12(3)*z**12)
-      GM_n = mu_n*(a0(4)*z**0+a1(4)*z**1+a2(4)*z**2+a3(4)*z**3+a4(4)*z**4+a5(4)*z**5+a6(4)*z**6+a7(4)*z**7+a8(4)*z**8+a9(4)*z**9+a10(4)*z**10+a11(4)*z**11+a12(4)*z**12)
-*
-      delm = del2/(2D0*Mp)**2
-*
-      F1pn(1) = (GE_p - delm*GM_p)/(1D0-delm)
-      F1pn(2) = (GE_n - delm*GM_n)/(1D0-delm)
-      F2pn(1) = (GM_p - GE_p)/(1D0-delm)         
-      F2pn(2) = (GM_n - GE_n)/(1D0-delm)         
-      return
-      end
-
 
       subroutine V3subd( A, B, C)
       implicit double precision (A-H,O-Z)
@@ -2915,7 +3055,6 @@ c
       double precision cosphe,sinphe
       real pi0mom,PolarTheta,Azimuthalphi,pi0momx,pi0momy,pi0momz
       real pi0the,pi0phi
-      integer i
 ccc- Hyon-Suk
       common/radmick/PhRAD
       real PhRAD(4)
@@ -2951,21 +3090,11 @@ c
       sintVq = sqrt(1D0 - costVq**2)
 *
       if(cl_pi0) then
-       pi0mom=sqrt(Egam*Egam-mpi0*mpi0)
-       costgg = (2D0*Egam*(Mp + nu) + Q2d - 2D0*Mp*nu-mpi0*mpi0)
-      else if(cl_eta) then
-       pi0mom=Egam*Egam-metta*metta
-       if(pi0mom.gt.0.0) then
-        pi0mom=sqrt(pi0mom)
-        costgg = (2D0*Egam*(Mp + nu) + Q2d - 2D0*Mp*nu-metta*metta)
-       else
-        print *,'problem',pi0mom,Egam,costgg
-        pi0mom=0.0
-        costgg=2.0
-       endif
+      pi0mom=sqrt(Egam*Egam-mpi0*mpi0)
+      costgg = (2D0*Egam*(Mp + nu) + Q2d - 2D0*Mp*nu-mpi0*mpi0)
       else
-        print *,'error: unknown particle'
-       stop
+       pi0mom=sqrt(Egam*Egam-metta*metta)
+       costgg = (2D0*Egam*(Mp + nu) + Q2d - 2D0*Mp*nu-metta*metta)
       endif
       costgg = costgg/(2D0*pi0mom*qmod)
       if(abs(costgg).gt.1) then
@@ -2975,7 +3104,7 @@ c       print *,'costgg-------->',costgg   ! shit happens
       else
         sintgg = sqrt(1D0 - costgg**2)
       endif
-c
+
       Vgx = pi0mom*sintgg*cos(phigd)
       Vgy = pi0mom*sintgg*sin(phigd)
       Vgz = pi0mom*costgg
@@ -3018,14 +3147,13 @@ c
        gpi0t=pi0the
  10    continue
        if(cl_pi0) then
-        CALL LU1ENT(1,111,gpi0e,pi0the,pi0phi)
+       CALL LU1ENT(1,111,gpi0e,pi0the,pi0phi)
        else
-        CALL LU1ENT(1,221,gpi0e,pi0the,pi0phi)
+       CALL LU1ENT(1,221,gpi0e,pi0the,pi0phi)
        endif
-c
+
        CALL LUEXEC   ! decay pi0 
-       if(cl_verblev.eq.2) write (6,*),gpi0e,N,(k(i,2),i=1,N)
-c
+
        if(k(3,2).ne.22) then
         dalOK=.TRUE.          ! decay pi0 ->gamma,e+/e- 
         if (k(3,2).eq.11) then ! first electron
@@ -3043,7 +3171,7 @@ c
          v3el(2)=P(4,2)
          v3el(3)=P(4,3)
         else
-          if(cl_verblev.gt.1) print *,'Unknown PID!!!! ',k(3,2)
+          print *,'Unknown PID!!!! ',k(3,2)
           goto 10
         endif
 c
@@ -3057,8 +3185,8 @@ c       call lulist(1)
        v3gam(1)=P(2,1)
        v3gam(2)=P(2,2)
        v3gam(3)=P(2,3)
-c
-*
+c*
+
       return
       end
 c
@@ -3099,27 +3227,26 @@ c
       return
       end
 c
-      subroutine getphoton(xbd,Q2d,del2d,phield,phigd,costgg)
+      subroutine getphoton(xbd,Q2d,del2d,phield,phigd)
 c
 C     set to 0 all moments
       implicit none
 #include "dvcs.inc"
 #include "ludat1234.inc"
-#include "ntupgdvcs.inc"
 *
       dimension V3k1(3), V3q(3)
       dimension  V3p1(3), V3plus(3)
       double precision V3k1,V3q,V3p1,V3plus
       double precision xbd,Q2d,del2d,phield,phigd
       double precision yb,nu,Esc,sintel,costel,costVq,sintVq,qmod
-      double precision Ep,Egam,Eele_inner,costgg,sintgg,Vgx,Vgy,Vgz
+      double precision Ep,Egam,costgg,sintgg,Vgx,Vgy,Vgz
       double precision costeg,teteg,coste1g,tete1g,V3dotd
       double precision cosphe,sinphe
       integer j
 ccc- Hyon-Suk
       common/radmick/PhRAD
       real PhRAD(4)
-      common/radhs/radtheta, ichannel
+      common/radhs/radtheta
       real radtheta
 ccc- Hyon-Suk
 c
@@ -3127,71 +3254,26 @@ c
       qmod = sqrt(nu**2 + Q2d)
 ccc- Hyon-Suk
 c      if(Ed.ne.cl_beam_energy) print *,'dans getphoton : Ed=',Ed
-c      if((PhRAD(4).gt.0.).and.(ichannel.eq.2)) Ed=cl_beam_energy-PhRAD(4)
+      if((PhRAD(4).gt.0.).and.(radtheta.le.0.15)) Ed=cl_beam_energy-PhRAD(4)
 ccc- Hyon-Suk
       yb = nu/Ed
-      Esc = cl_beam_energy - nu
-      costel = 1D0 - Q2d/(2D0*cl_beam_energy*Esc)
+      Esc = Ed - nu
+      costel = 1D0 - Q2d/(2D0*Ed*Esc)
       sintel = sqrt(1D0 - costel**2)
-      cosphe=cos(phield)
-      sinphe=sin(phield)
 c
-      if(cl_radgen) then
-         if (PhRAD(4).gt.0.) then
-            if (ichannel.gt.2) then
-               PhRAD(1) = PhRAD(4)*sintel*cosphe
-               PhRAD(2) = PhRAD(4)*sintel*sinphe
-               PhRAD(3) = PhRAD(4)*costel
-            else
-               PhRAD(1) = 0.
-               PhRAD(2) = 0.
-               PhRAD(3) = PhRAD(4)
-               Ed=Ed-PhRAD(4)
-            endif
-         endif
-      endif
-
+      Ep   = Mp - del2d/(2D0*Mp)
+      Egam = nu + del2d/(2D0*Mp)
 c
       V3k1(1) = 0D0
       V3k1(2) = 0D0
-      V3k1(3) = Ed ! Use the effective beam energy after the energy loss.
-
+      V3k1(3) = Ed
+      cosphe=cos(phield)
+      sinphe=sin(phield)
       V3k2(1) = Esc*sintel*cosphe
       V3k2(2) = Esc*sintel*sinphe   !0D0
       V3k2(3) = Esc*costel
-
-      if(cl_radgen) then
-         if (PhRAD(4).gt.0.) then
-            if (ichannel.gt.2) then
-               Eele_inner = Esc + PhRad(4)
-               V3plus(1) = Eele_inner*sintel*cosphe
-               V3plus(2) = Eele_inner*sintel*sinphe
-               V3plus(3) = Eele_inner*costel
-               call V3subd( V3k1, V3plus, V3q)
-               Q2d = -(Ed-Esc-PhRad(4))**2 + V3q(1)**2 + V3q(2)**2 + V3q(3)**2
-               nu = Ed-Eele_inner
-               qmod =  sqrt(V3q(1)**2 + V3q(2)**2 + V3q(3)**2)
-            else
-               call V3subd( V3k1, V3k2, V3q)
-               Q2d = -(Ed-Esc)**2 + V3q(1)**2 + V3q(2)**2 + V3q(3)**2
-               nu = Ed-Esc
-               qmod =  sqrt(V3q(1)**2 + V3q(2)**2 + V3q(3)**2)
-            endif
-         else
-            call V3subd( V3k1, V3k2, V3q)
-            nu = Ed-Esc
-            qmod =  sqrt(V3q(1)**2 + V3q(2)**2 + V3q(3)**2)
-         endif
-      else
-            call V3subd( V3k1, V3k2, V3q)
-      endif
-
-      radxb_true = Q2d/2/nu/Mp
-      radq2_true = Q2d
-
-      Ep   = Mp - del2d/(2D0*Mp)
-      Egam = nu + del2d/(2D0*Mp)
-
+*
+      call V3subd( V3k1, V3k2, V3q)
       costVq = V3q(3)/qmod
       sintVq = sqrt(1D0 - costVq**2)
 *
@@ -3207,21 +3289,32 @@ c
 *
       call V3subd( V3q, V3gam, V3p2)
 ccc- Hyon-Suk
+      if(cl_radgen) then
+       if (PhRAD(4).gt.0.) then
+c        print *,'getphoton : radtheta=',radtheta
+c        print *,'!!!!dans getphoton: PhRAD = ',PhRAD
+        if(radtheta.gt.0.15) then
+         PhRAD(1) = PhRAD(4)*sintel*cosphe
+         PhRAD(2) = PhRAD(4)*sintel*sinphe
+         PhRAD(3) = PhRAD(4)*costel
+         V3k2(1)=V3k2(1)-PhRAD(1)
+         V3k2(2)=V3k2(2)-PhRAD(2)
+         V3k2(3)=V3k2(3)-PhRAD(3)
+        else
+         PhRAD(1) = 0.
+         PhRAD(2) = 0.
+         PhRAD(3) = PhRAD(4)
+        endif
+       endif
+      endif
 ccc- Hyon-Suk
       N=2
-c
-c
-        p(2,4)=0.0      ! gamma_E
-        p(2,5)=0.0      ! gamma_M
        DO j=1,3
         p(2,j)=V3gam(j)
-        p(2,4)=p(2,4)+V3gam(j)*V3gam(j)
        enddo
-        if( p(2,4).gt.0) p(2,4)=sqrt(p(2,4))
-c
+        p(2,5)=0.0      ! gamma
         k(2,2)=22   ! photon
-        k(2,1)=1    ! final
-      
+
 *
       return
       end
@@ -3329,99 +3422,4 @@ c     translate the decimal portion
 
       return
       end     
-c
-      integer function ivalnum(str)
-c     return the real value contained into a string
 
-      implicit integer (k-l)
-      character *(*) str
-      logical segno
-      double precision valnum
-      
-
-      segno=.false.
-      valnum=0.00
-      lu=length(str)
-      
-c     check the number sign
-      if(str(1:1).eq.'-')then
-      segno=.true.
-      str=str(2:lu)
-      lu=lu-1
-      end if
-
-c     check if number is float or integer
-      if(index(str,'.').ne.0)then
-      iin=index(str,'.')-1
-      else
-      iin=lu
-      end if
-
-      ifr=lu-(iin+1)
-
-c     translate the integer portion
-      doi=1,iin  
-      k=ichar(str(i:i))-48
-      valnum=valnum+float(k)*10.00**float(iin-i)
-      end do         
-
-      if(iin.eq.lu)goto 10
-      str=str(iin+2:lu)
-
-c     translate the decimal portion
-      doi=1,ifr  
-      k=ichar(str(i:i))-48
-      valnum=valnum+float(k)/10.00**float(i)
-      end do
-
-10    if(segno)valnum=-valnum
-      ivalnum=int(valnum)
-      return
-      end     
-c
-c     k_T correction to A_LU from Marc Vdh program
-c
-
-       real function corraul(delt,dQ2)
-       double precision delt,dQ2
-       real t,Q2,qfac,tfac
-       t=-delt
-       Q2=dQ2
-       if(Q2.lt.1.5) Q2=1.5
-       if(Q2.gt.2.6) Q2=2.6
-       qfac=(0.69*t-1.04*t*t)*(q2-1.5)/1.1+1.0
-       tfac=(0.908-alog(t)/9.5)
-       corraul=1.0/qfac*tfac
-       return 
-       end
-c
-       subroutine RNDMSEED()
-       implicit none
-#include "dvcs.inc"
-       integer*4 now(3),ifilenum
-       integer iran,irannom
-       real rand,rnd
-       integer :: n
-       integer,allocatable :: seeds(:)
-
-c
-c
-      if(cl_seed.eq.0) then
-      call itime(now)     ! now(1)=hour, (2)=minute, (3)=second
-  	  irannom=now(3)+now(1)*3600+now(2)*60
-  	  else 
-  	  irannom=cl_seed
-  	  endif
-      call random_seed(size=n) ! get size of the seed used by the OS
-      allocate(seeds(n))
-      seeds = irannom 
-      call random_seed(put=seeds)
-      deallocate(seeds)
-      CALL SRAND(irannom)
-      call random_number(rnd)  ! random number in [0,1]
-      print *,'Rndm numb->',irannom,now(1),now(2),now(3),rnd
-c           DO 100 iran=1,irannom
-c 100       RND=rand()
-c
-	   return
-	   end
