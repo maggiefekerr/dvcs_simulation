@@ -9,6 +9,10 @@ build/
 *.o
 *.a
 
+# Data files
+*.dat
+*.data
+
 # Editor files
 .vscode/
 .idea/
@@ -18,3 +22,4 @@ build/
 
 # Dependencies (should be built from source)
 dependencies/dvcsgen/dvcsgen
+EOF
