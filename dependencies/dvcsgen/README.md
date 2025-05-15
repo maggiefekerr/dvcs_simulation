@@ -1,8 +1,23 @@
 # dvcsgen
 dvcs/pi0/eta  generator using pdfs and gpds. 
+
+```
 git clone https://github.com/JeffersonLab/dvcsgen.git
 cd dvcsgen
 make
+```
+
+Please cite the following articles for this generator.
+```
+V. A. Korotkov and W. D. Nowak, Eur. Phys. J. C 23, 455–
+461 (2002).
+I. Akushevich and A. Ilyichev, Phys. Rev. D 98, 013005 (2018).
+```
+
+The supplementary material of the following article contains the global fitting of the EM form factors.
+```
+Z. Ye, J. R. Arrington, R. J.Hill and G. Lee, Phys. Lett. B 777 (2018) 8–15
+```
 
 To get command line options `./dvcsgen --help`
 
@@ -42,9 +57,7 @@ will write `gemc lund type` single data file dvcs.dat with 10K events
       --zwidth z-width 0  width z in cm (zpos+/-zwidth/2)
        --raster diameter 0.75   raster diameter in cm
       --weight   flat distributions with weight(part12)
-      --phi   set a trento angle for printing out rc factor (rad)
       --printgpd               print gpds and exit
-      --printrad               print rc factors
       --nont               do not write out the ntuple
       --file              dvcspi0gen   filename
       --gpd  Igpd 3  GPD model(1-A,2-B,3-C,4-D) 101 VGG+Dterm
@@ -57,7 +70,9 @@ will write `gemc lund type` single data file dvcs.dat with 10K events
       --mom                include moments in ntuple
       --proloss                  add proton loss
       --ktcor          FALSE   turn on k_t cor for A_LU
+      --globalfit      FALSE   use the global fitting results of EM form factors
       --radgen                   include radgen
+      --radext                   include external radiative corrections
       --radstable                use born cross sections for rejection sampling
       --nodat               do not write a data file
       --acce16            include e16 acceptance for e-
@@ -73,12 +88,13 @@ will write `gemc lund type` single data file dvcs.dat with 10K events
       --bh  value      3 BH status:3-All, 1-only BH
       --delta  value      0.01 Minimum rad photon energy (GeV)'
       --vv2cut value      0.1 cuts on missing mass ep squared (GeV^2)'
+
 ```
 
 For the writef 2 option, the file format is still lund, [https://gemc.jlab.org/gemc/html/documentation/generator/lund.html](https://gemc.jlab.org/gemc/html/documentation/generator/lund.html).
 
 But the contents are changed for the radiative corrections.
-So, --writef 2 is only useful when --radgen is on.
+So, ```--writef 2``` is only useful when ```--radgen``` is on.
 
 The header's event weight is still the radiative cross section (weight of MC::Header).
 
@@ -89,20 +105,8 @@ The electron: (2) xB, (6) radiation mode (1: nonrad, 2:s-peak, 3:p-peak), (10) Q
 
 The proton: (2) phi (radians), (10) shifted xB of the virtual photon, (11) shifted Q2 of the virtual photon.
 
-The photon: (11) born cross section.
+The photon: (2) actual beam electron energy (See ```External Radiative Corrections``` below), (11) born cross section.
 
-## printing rc factors
+## External Radiative Corrections
 
-```
-./dvcsgen --beam 10.604 --x 0.3 0.3 --q2 2 2 --t 0.29 0.29  --gpd 101 --y 0 1 --phi 1.5708 --vv2cut 0.3 --delta 0.1 --printrad
-```
-will print out the related RC factors for all iterations at xB = 0.3, Q2 = 2, -t = 0.29, and phi = pi/2 (in rad.).
-
-The RC code is MC integrating 5 dimensional cross sections over the kinematics of radiative photons.
-Thus, the RC cross section is intrinsically probablistic and fluctuating.
-To stabilize, the 'printrad' module runs 10 iterations of rc factor calculations, each of which consists of 100 times of cross section calculations.
-Finally, the line above is quite verbose. A useful command is 
-```
-./dvcsgen --beam 10.604 --x 0.3 0.3 --q2 2 2 --t 0.29 0.29  --gpd 101 --y 0 1 --phi 1.57 --vv2cut 0.3 --delta 0.1 --printrad: grep averaged:
-```
-to only print out the final result of A_born, A_obs, delta_u, delta_p, delta_A.
+For the realistic radiative generators, the external radiative corrections are required for the incoming electron because the interactions between the beam electron and the target materials happen prior to the vertex. So far, the program is reducing the energy only, without considering the angle smearing from the multiple scattering. The energy loss formula is from the approximation by Mo & Tsai (1969) [https://journals.aps.org/rmp/abstract/10.1103/RevModPhys.41.205](https://journals.aps.org/rmp/abstract/10.1103/RevModPhys.41.205). The materials depends on the target configuration. So far, this option assumes the RG-A target geometry only. One can turn on the external RC by adding ```--radext``` option. If ```--writef 2``` is turned on, the photon's (2) lifetime column will record the actual incoming electron energy.

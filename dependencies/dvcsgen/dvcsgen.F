@@ -183,7 +183,6 @@ c
       cl_thmax=1.57            ! def e'tmax
       cl_tmax=1.0             ! def tmax
       cl_tmin=0.0             ! def tmin
-      cl_phigd=0.0            ! def phigd for rc factor
       cl_q2max=15.0            ! def Q2 max
       cl_q2min=1.0            ! def Q2 min
       cl_xmax=0.75             ! def Q2 max
@@ -209,11 +208,11 @@ c
       cl_triggers = 10000  
       cl_nmax = 2000         ! max number of events in the file
       cl_printgpd=.FALSE.
-      cl_printrad=.FALSE.
-      cl_printdstot=.FALSE.
       cl_mom=.FALSE.
       cl_ktcor=.FALSE.
+      cl_global=.FALSE.
       cl_radgen=.FALSE.
+      cl_radext=.FALSE.
       cl_radstable=.FALSE.
       cl_mod=0              ! write all, otherwise filter
       datfileOK=.TRUE.      ! write a data file
@@ -263,6 +262,8 @@ c
            cl_pol=2
         elseif(cnumber.eq.'--radgen') then
            cl_radgen=.TRUE.
+        elseif(cnumber.eq.'--radext') then
+           cl_radext=.TRUE.
         elseif(cnumber.eq.'--radstable') then
            cl_radstable=.TRUE.
         elseif(cnumber.eq.'--mom') then
@@ -275,6 +276,8 @@ c
            cl_dvcs=.FALSE.
         elseif(cnumber.eq.'--ktcor') then
            cl_ktcor=.TRUE.
+        elseif(cnumber.eq.'--globalfit') then
+           cl_global=.TRUE.
         elseif(cnumber.eq.'--beam'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
@@ -319,10 +322,6 @@ c
            i=i+1
            CALL GETARG(i,cnumber)
            cl_wmin=valnum(cnumber)
-        elseif(cnumber.eq.'--phi'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_phigd=valnum(cnumber)
         elseif(cnumber.eq.'--y'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cnumber)
@@ -369,10 +368,6 @@ c
            i=i+1
            CALL GETARG(i,cnumber)
            cl_vv2cut=valnum(cnumber)           
-        elseif(cnumber.eq.'--heli'.and.i.lt.numopts) then
-           i=i+1
-           CALL GETARG(i,cnumber)
-           cl_heli=valnum(cnumber)           
         elseif(cnumber.eq.'--targ'.and.i.lt.numopts) then
            i=i+1
            CALL GETARG(i,cl_target)
@@ -380,10 +375,6 @@ c
            datfileOK=.FALSE.
         elseif(cnumber.eq.'--printgpd') then
            cl_printgpd=.TRUE.
-        elseif(cnumber.eq.'--printrad') then
-           cl_printrad=.TRUE.
-        elseif(cnumber.eq.'--printdstot') then
-           cl_printdstot=.TRUE.
         elseif(cnumber.eq.'--acce16') then
            acce16=.TRUE.
         elseif(cnumber.eq.'--acc12') then
@@ -446,227 +437,6 @@ c
         return 
         end
 c
-        SUBROUTINE  printrad
-        implicit none
-#include "dvcs.inc"
-C..
-        integer nx,nq,nt,nfe,nfg
-        real  xmax,xmin,q2max,q2min,tmax,tmin 
-        common /xmax/  xmax,xmin,q2max,q2min,tmax,tmin 
-     6                 ,nx,nq,nt,nfe,nfg
-C..
-C..
-      double precision xbd,Q2d,del2d,phield,phigd,dstot,stotint,yb,w2
-     6                ,avgdstot,avgprobn,avgprobs,avgprobp,xsec_born,xsec_obs,sum_born,sum_obs,unc_obs,var_obs
-     6                ,del_born, del_obs, delu,delp, A_obs, delta_u, delta_p, delta_A
-     6                , unc_A_obs, unc_delta_u, unc_delta_p, unc_delta_A, dsigma_born, dsigma_obs, unc_dsigma_born, unc_dsigma_obs
-      integer la0,itrial,iloop,numn,nump,nums
-c internal variables
-c
-        logical outoflimits
-        real altime,alltime(2)
-        real*8 t1lim, t2lim
-c
-        DO iloop=0,9
-        la0=0
-        sum_obs = 0
-        sum_born = 0
-        del_obs = 0
-        del_born = 0
-        if(cl_pol.ge.1) la0=-1
-          DO helpi=la0,1,2
-            DO heli=-1,1,2
-               nums = 0
-               nump = 0
-               numn = 0
-               avgdstot = 0
-               avgprobs = 0
-               avgprobp = 0
-               avgprobn = 0
-          xbd=xmin!+ix*dx
-          Q2d=q2min!+iq*dq
-           yb=Q2d/(2D0*Mp*xbd*cl_be)
-           w2=Mp*Mp+2.0*Mp*cl_be*yb-Q2d
-c
-         if( .not.outoflimits(xbd,Q2d) ) then
-c
-              t2lim=-0.5d0*((q2d/xbd-q2d)*(q2d/xbd+sqrt((q2d/xbd)**2+4d0*Mp*Mp*q2d))+2d0*Mp*Mp*q2d)/w2
-              t1lim=-0.5d0*((q2d/xbd-q2d)*(q2d/xbd-sqrt((q2d/xbd)**2+4d0*Mp*Mp*q2d))+2d0*Mp*Mp*q2d)/w2
-              tmax = min(-cl_tmin, t1lim)
-              tmin = max(-cl_tmin, t2lim)
-              if (tmax<tmin) then
-                 print *, "check -t limit"
-                 return
-              endif
-              del2d=tmin!+it*dt
-              phigd=cl_phigd
-c
-              CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
-              xsec_born = dstot*2*pi*0.001
-
-              print *, "Loop over 100 iterations for rad. cross sections"
-
-              xff = xbd
-              q2ff = Q2d
-              tff = del2d
-              phiff = pi-phigd
-              ebeamff = cl_beam_energy
-              ikeygene = 10
-              DO itrial=0,99
-                 CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot,probn,probp,probs)
-                 dstot = dstot*0.001
-                 avgdstot = avgdstot + dstot/100
-                 avgprobp = avgprobp + probp/100
-                 avgprobs = avgprobs + probs/100
-                 avgprobn = avgprobn + probn/100
-                 if (ichannel.eq.1) then
-                    numn = numn+1
-C                     print *, egamma, dstot, ichannel, heli, helpi, xsec_born
-                 endif
-                 if (ichannel.eq.2) then
-                    nums = nums+1
-C                     print *, egamma, dstot, ichannel, heli, helpi
-                 endif
-                 if (ichannel.eq.3) then
-                  nump = nump+1
-C                   print *, egamma, dstot, ichannel, heli, helpi
-                 endif
-              ENDDO
-              xsec_obs = avgdstot
-
-              sum_obs = sum_obs + xsec_obs
-              sum_born = sum_born + xsec_born
-              del_obs = del_obs + xsec_obs*heli
-              del_born = del_born + xsec_born*heli
-
-              print *, "=======sanity check for reasonable event generation=========loop====",iloop
-              print *, "average prob_n, average prob_s, average prob_p, nevents_n, nevents_s, nevents_p"
-              print *,  avgprobn, avgprobs,avgprobp, numn, nums, nump
-              print *, "=======kinematic variables in ", heli,"helicity=========loop====",iloop
-              print *, "helicity, xb, Q2, -t, phi, xsec_born, xsec_obs"
-              print *, heli, xbd, Q2d, del2d, phigd, xsec_born/2, xsec_obs/2
-c
-c
-c
-            else 
-               print *, "check xb and q2"
-            endif
-           ENDDO
-        ENDDO
-              print *, "=======RC factors in loop====",iloop
-              print *, "A_born, A_obs, delta_u, delta_p, delta_A"
-              print *, del_born/sum_born, del_obs/sum_obs, sum_obs/sum_born, del_obs/del_born, (del_obs/del_born)/(sum_obs/sum_born)-1
-              A_obs = A_obs + del_obs/sum_obs/10
-              dsigma_obs = dsigma_obs + sum_obs/10
-              dsigma_born = dsigma_born + sum_born/10
-              delta_u = delta_u + sum_obs/sum_born/10
-              delta_p = delta_p + del_obs/del_born/10
-              delta_A = delta_A + ((del_obs/del_born)/(sum_obs/sum_born)-1)/10
-
-              unc_A_obs = unc_A_obs+(del_obs/sum_obs)**2/10 ! rms
-              unc_dsigma_obs = unc_dsigma_obs + sum_obs**2/10 ! rms
-              unc_dsigma_born = unc_dsigma_born + sum_born**2/10 ! rms
-              unc_delta_u = unc_delta_u+(sum_obs/sum_born)**2/10 ! rms
-              unc_delta_p = unc_delta_p+(del_obs/del_born)**2/10 ! rms
-              unc_delta_A = unc_delta_A+((del_obs/del_born)/(sum_obs/sum_born)-1)**2/10 ! rms
-      ENDDO
-              unc_A_obs = sqrt(unc_A_obs - A_obs**2)
-              unc_dsigma_obs = sqrt(unc_dsigma_obs - dsigma_obs**2)
-              unc_dsigma_born = sqrt(unc_dsigma_born - dsigma_born**2)
-              unc_delta_u = sqrt(unc_delta_u - delta_u**2)
-              unc_delta_p = sqrt(unc_delta_p - delta_p**2)
-              unc_delta_A = sqrt(unc_delta_A - delta_A**2)
-
-              print *, "=======RC factors averaged over 10 loops============"
-              print *, "A_born, A_obs, delta_u, delta_p, delta_A"
-              print *, "averaged:", del_born/sum_born, A_obs, delta_u, delta_p, delta_A
-              print *, "unc_A_born, unc_A_obs, unc_delta_u, unc_delta_p, unc_delta_A"
-              print *, 0, unc_A_obs, unc_delta_u, unc_delta_p, unc_delta_A
-              print *, "Frad_with_error", delta_u, unc_delta_u
-              print *, "differential_x_sec", dsigma_obs/2, unc_dsigma_obs/2, dsigma_born/2, unc_dsigma_born/2
-        return
-        end
-
-
-        SUBROUTINE  printdstot 
-C module for reweighting        
-        implicit none
-#include "dvcs.inc"
-C..
-        integer nx,nq,nt,nfe,nfg
-        real  xmax,xmin,q2max,q2min,tmax,tmin 
-        common /xmax/  xmax,xmin,q2max,q2min,tmax,tmin 
-     6                 ,nx,nq,nt,nfe,nfg
-C..
-C..
-      double precision xbd,Q2d,del2d,phield,phigd,dstot,stotint,yb,w2
-     6                ,avgdstot,avgprobn,avgprobs,avgprobp,xsec_born,xsec_obs,sum_born,sum_obs,unc_obs,var_obs
-     6                ,del_born, del_obs, delu,delp, A_obs, delta_u, delta_p, delta_A
-     6                , unc_A_obs, unc_delta_u, unc_delta_p, unc_delta_A, dsigma_born, dsigma_obs, unc_dsigma_born, unc_dsigma_obs
-      integer la0,itrial,iloop,numn,nump,nums
-c internal variables
-c
-        logical outoflimits
-        real altime,alltime(2)
-        real*8 t1lim, t2lim
-
-        helpi = 0 ! unpol target
-c
-          xbd=xmin!+ix*dx
-          Q2d=q2min!+iq*dq
-           yb=Q2d/(2D0*Mp*xbd*cl_be)
-           w2=Mp*Mp+2.0*Mp*cl_be*yb-Q2d
-c
-         if( .not.outoflimits(xbd,Q2d) ) then
-c
-           t2lim=-0.5d0*((q2d/xbd-q2d)*(q2d/xbd+sqrt((q2d/xbd)**2+4d0*Mp*Mp*q2d))+2d0*Mp*Mp*q2d)/w2
-           t1lim=-0.5d0*((q2d/xbd-q2d)*(q2d/xbd-sqrt((q2d/xbd)**2+4d0*Mp*Mp*q2d))+2d0*Mp*Mp*q2d)/w2
-           tmax = min(-cl_tmin, t1lim)
-           tmin = max(-cl_tmin, t2lim)
-           if (tmax<tmin) then
-              print *, "check -t limit"
-              return
-           endif
-           del2d=tmin!+it*dt
-           phigd=cl_phigd
-
-           if (cl_heli.eq.1) then
-              heli = 1 ! polarized beam, (+) heli
-              CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
-              xsec_born = dstot
-              xff = xbd
-              q2ff = Q2d
-              tff = del2d
-              phiff = pi-phigd
-              ebeamff = cl_beam_energy
-              CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot,probn,probp,probs)
-              dstot = dstot/2/pi
-              print *, "xsec_obs,xsec_born:", dstot, xsec_born
-           else if (cl_heli.eq.-1) then
-
-              heli = -1 ! polarized beam, (-) heli
-              CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
-              xsec_born = dstot
-              xff = xbd
-              q2ff = Q2d
-              tff = del2d
-              phiff = pi-phigd
-              ebeamff = cl_beam_energy
-              CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot,probn,probp,probs)
-              dstot = dstot/2/pi
-              print *, "xsec_obs,xsec_born:", dstot,  xsec_born
-            else
-               print *, "check helicity"
-               return
-            endif
-         else 
-            print *, "check xb and q2"
-         endif
-
-        return
-        end
-
-
         subroutine printgpd
         IMPLICIT NONE
 #include "dvcs.inc"
@@ -728,7 +498,11 @@ c            asymmetries at 90-degree
              alu=hs1Iunp/(hc0BH+hc0dvcs+hc0Iunp)
 c           print *,'xbd,Q2d,del2',xbd,Q2d,del2d,del2min,del2max
       if( del2d.le.del2min .and. del2d.ge.del2max ) then  ! in limits
+      if (cl_global) then
+      call nuclFF_YAHL( del2d )
+      else
       call nuclFF( del2d )
+      endif
       skew = xbd/(2D0 - xbd)
       IF(IGPD.lt.100) then
       call amptab(skew, del2d, 
@@ -796,6 +570,7 @@ c
         print *,'     --mom                include moments in ntuple'
         print *,'     --proloss                  add proton loss'
         print *,'     --ktcor          FALSE   turn on k_t cor for A_LU'
+        print *,'     --globalfit      FALSE   use the global fitting results of EM form factors'
         print *,'     --radgen                   include bhradgen'
         print *,'     --radstable                use born cross sections for rejection sampling'
         print *,'     --nodat               do not write a data file'
@@ -841,6 +616,7 @@ c
         print *,'GPD model A,B,C,D:   ', cl_gpd 
         print *,'GPD sinphi scale:   ', cl_scale 
         print *,'BHRADGEN ON        :   ', cl_radgen 
+        print *,'External Radiative Correct ON        :   ', cl_radext 
         print *,'Use Born Cross sections when bhradgen on :   ', cl_radstable
         print *,'y_col cut        :   ', cl_ycol 
         print *,'acceptance       :   ',acceg1,acce16,acc12
@@ -849,7 +625,6 @@ c
         print *,'write mod       :   ',cl_mod
         print *,'Minimum rad photon energy:  ',cl_delta
         print *,'cuts on missing mass ep (GeV^2):  ',cl_vv2cut
-        print *,'trento angle to be used at the printing rc factor:  ',cl_phigd
         print *,'write file_name  :   ',bosout
         if(cl_mom) print *,'include moments in the ntuple:   ', cl_mom 
         if(cl_smear.eq.1) 
@@ -857,6 +632,14 @@ c
      6,cl_proloss  
         print *,'__________________________________'
         print *,'verbosity level',  cl_verblev
+	if(cl_tmax.gt.1.0.and.cl_dvcs.and.cl_gpd.lt.100) then
+	  print *,'t>0.5 not supported for --gpd <100:  ',cl_tmax
+	  call exit(-1)
+	endif 
+	if(cl_tmax.gt.1.79.and.cl_dvcs.and.cl_gpd.ge.100) then
+	  print *,'t>1 not supported for --gpd >100:  ',cl_tmax
+	  call exit(-1)
+	endif 
         return
         end
 
@@ -940,17 +723,6 @@ C.. Simulation for a proton
 C
 C       get the maximum 5-dim x-section
 C
-
-        if(cl_printdstot) then 
-        call printdstot
-        stop
-        endif
-
-        if(cl_printrad) then 
-        call printrad
-        stop
-        endif
-
         if(cl_printgpd) then 
         call printgpd
         stop
@@ -1020,7 +792,7 @@ c
                  tmax = min(-cl_tmin, t1lim)
                  tmin = max(-cl_tmax, t2lim)
                  if (tmax<tmin) then
-                    continue
+                    cycle
                  endif
               dt=(tmax-tmin)/nt
               del2d=tmin+it*dt
@@ -1030,6 +802,7 @@ c
                phield=ife*dfe
                cife=1.0
                if(ife.eq.1.or.ife.eq.nx) cife=0.5
+               if(cl_pol.le.1) cife = 1
                DO ifg=1,nfg
                 phigd=ifg*dfg
                 cifg=1.0
@@ -1043,7 +816,10 @@ c
                     phiff = pi-phigd
                     ebeamff = cl_beam_energy
                     ikeygene = 4
-                    CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot,probn,probp,probs)
+                    CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot)
+                    if (isnan(dstot).or.(dstot.le.0).or.(dstot.gt.huge(dstot))) then
+                     dstot = 0
+                    endif                    
                     dstot = dstot/2.0/pi
                 else
                     CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
@@ -1055,7 +831,7 @@ c
               stop
              endif
 c
-             stotint=stotint+dstot*cix*cit*ciq*cife*cifg
+             if (dstot>0) stotint=stotint+dstot*cix*cit*ciq*cife*cifg*dx*dt*dq*dfe*dfg
 c
            if(smax.lt.dstot) then
             smax=dstot
@@ -1077,7 +853,7 @@ c        print *,'bad-y',xmin,xmax,xbd,q2min,q2max,q2d,del2d
        ENDDO
        ENDDO
        if(cl_verblev.gt.-1) print *,'Maximum found at',SMAX,
-     6'x-sec(pb) = ',stotint*dx*dt*dq*dfe*dfg,dx*dt*dq*dfe*dfg
+     6'x-sec(pb) = ',stotint
           ENDDO
          ENDDO
         return
@@ -1103,7 +879,7 @@ C..
         common /xmax/  xmax,xmin,q2max,q2min,tmax,tmin 
      6                 ,nx,nq,nt,nfe,nfg
 C..     generate a DVCS event
-      double precision xbd,Q2d,del2d,phield,phigd,dstot,yb,w2
+      double precision xbd,Q2d,del2d,phield,phigd,dstot,yb,w2, costgg
 c
 c       radiative stuff
 c
@@ -1115,11 +891,14 @@ c
         logical outoflimits
         real  beam_energy
         real*8 t1lim, t2lim
+        real random_num
+        real nud, nud_shifted
 c
         beam_energy=cl_beam_energy
         LEN=8
         ITRY=0
  10     CALL MYRANMAR(VEC,LEN)
+        Ed = cl_beam_energy
         ITRY=ITRY+1
         xbd=xmin+(xmax-xmin)*VEC(1)
         Q2d=q2min+(q2max-q2min)*VEC(2)
@@ -1173,10 +952,11 @@ C         endif
         w2=Mp*Mp+2.0*Mp*cl_beam_energy*yb-Q2d
                  t2lim=-0.5d0*((Q2d/xbd-Q2d)*(Q2d/xbd+sqrt((Q2d/xbd)**2+4d0*Mp*Mp*Q2d))+2d0*Mp*Mp*Q2d)/w2
                  t1lim=-0.5d0*((Q2d/xbd-Q2d)*(Q2d/xbd-sqrt((Q2d/xbd)**2+4d0*Mp*Mp*Q2d))+2d0*Mp*Mp*Q2d)/w2
-                 tmax = min(-cl_tmin, t1lim)
-                 tmin = max(-cl_tmax, t2lim)
 
+        tmax = -cl_tmin
+        tmin = -cl_tmax
         del2d=tmin+(tmax-tmin)*VEC(3)
+        if( del2d.ge.t1lim .or. del2d.le.t2lim ) goto 10   ! delta out of range
 ccc- Hyon-Suk
 C         if(radtheta.gt.0.15) then
 C          yb=Q2d/(2D0*Mp*xbd*cl_beam_energy)
@@ -1186,7 +966,7 @@ C          yb=Q2d/(2D0*Mp*xbd*(cl_beam_energy-PhRAD(4)))
 C          w2=Mp*Mp+2.0*Mp*(cl_beam_energy-PhRAD(4))*yb-Q2d
 C         endif
 ccc- Hyon-Suk
-        if(yb.gt.cl_ymax.or.w2.lt.cl_wmin) then 
+        if(yb.gt.cl_ymax.or.w2.lt.cl_wmin.or.yb.lt.cl_ymin) then 
              goto 10
          endif
 c
@@ -1200,19 +980,39 @@ c
         else
          helpi=0
         endif
+
+        randnum = random_num() ! common number used for vz
 c
         if(cl_dvcs) then
 C..     Generation of an event in GENDVCS 
             if (cl_radgen) then
-                    xff = xbd
-                    q2ff = Q2d
-                    tff = del2d
-                    phiff = pi-phigd
-                    ebeamff = cl_beam_energy
-                    ikeygene = 4
                     CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
                     bornweight = dstot
-                    CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot,probn,probp,probs)
+                    if (isnan(bornweight).or.(bornweight.le.0).or.(bornweight.gt.huge(bornweight))) goto 10
+                    if (cl_radext) then
+                     ebeamff = beam_energy - beam_energy * random_num()**(3./4./ (randnum*cl_zwidth/929.0 + 0.003/8.897))
+                    else
+                     ebeamff = beam_energy 
+                    endif
+                    ! External radiative correction, following L. W. Mo and Y. S. Tsai. Rev. Mod. Phys. 41, 205–235, 1969.
+                    ! Inverse transform sampling, dE = E0 * r ^ (1/bT), where the distribution is I(x) = bT*(x)^(bT-1), where 0<x=dE/E<1.
+                    ! T is the material thickness in units of radiation length.
+                    ! For the rg-a target, there is 30 µm aluminum window + LH2 (depending on the vz).
+                    !LH2 x0 = 929 cm, https://github.com/JeffersonLab/JPsiGen/blob/eb40dd934bb9f022873414a57e0dad9d1ccbcbdf/include/KinFunctions.h
+                    !Al  x0 = 8.897 cm,  https://pdg.lbl.gov/2022/AtomicNuclearProperties/HTML/aluminum_Al.html
+                    Ed = ebeamff
+                    ikeygene = 4
+                    nud = Q2d/(2D0*Mp*xbd)
+                    nud_shifted = nud - (cl_beam_energy - ebeamff)
+                    if (nud_shifted.le.0) goto 10 ! nu is the total energy change of beam to the scattered electron. The external energy loss can't exceed nu.
+                    q2ff = Q2d * ebeamff/cl_beam_energy ! Q2 = 2 * E_beam * E_sc * ( 1-cos theta). Taking into account that the E_beam is reduced is necessary for the correct cross section.
+                    xff = q2ff/(2D0*Mp*nud_shifted) ! Likewise, xB is shifted; nu -> nu - dE, xB = Q2/2/M/nu
+                    tff = del2d
+                    phiff = pi-phigd
+                    CALL bhradgen(ebeamff, xff, q2ff, tff, phiff,cl_vv2cut,cl_delta,egamma,thetag,phig,ichannel,cl_pol,ikeygene,dstot)
+                    if (isnan(dstot).or.(dstot.le.0).or.(dstot.gt.huge(dstot))) then
+                     dstot = 0
+                    endif
                     dstot = dstot/2.0/pi
                     radweight = dstot
                     radq2 = Q2d
@@ -1222,7 +1022,15 @@ C..     Generation of an event in GENDVCS
                     iproctype = ichannel
                     PhRAD(4) = egamma
             else
+                ebeamff = cl_beam_energy
+                Ed = ebeamff
                 CALL bmkxsec(xbd, Q2d, del2d, phield,phigd,dstot)
+                    bornweight = dstot
+                    radweight = dstot
+                    radq2 = Q2d
+                    radxb = xbd
+                    radt = del2d
+                    radphi = phigd
             endif
         else
         CALL excpi0(xbd, Q2d, del2d, phield,phigd,dstot)
@@ -1236,7 +1044,8 @@ c
           if(dstot.le.smax*VEC(6)) goto 10 ! use x-section
         endif
         if(cl_dvcs) then
-           call getphoton(xbd,Q2d,del2d,phield,phigd)
+           call getphoton(xbd,Q2d,del2d,phield,phigd,costgg)
+           if (costgg>1) goto 10
         else
            call getpi0(xbd,  Q2d, del2d,phield,phigd)
         endif
@@ -1384,7 +1193,7 @@ c
 c
         integer jj,j,jl,k(4000,5)
         real gy,gw2,u,p(4000,5),rhelpi,rheli
-        real randnum,random_num
+        real random_num
         real PARL(2),plu(4),V(4)                   ! for LUND-compatibility
         data PARL/1.0,1.0/
         data plu/-1.0,1.0,0.0,0.0/
@@ -1425,11 +1234,11 @@ c
            gy=1.0-gelee/cl_beam_energy
            gw2=gw*gw
            u=heli+10*helpi
-            randnum=random_num()-0.5
+            !randnum=random_num()-0.5
  9         v(1)=(cl_rast*(random_num()-0.5)+cl_xpos)
            v(2)=(cl_rast*(random_num()-0.5)+cl_ypos)
       if(sqrt((v(1)-cl_xpos)**2+(v(2)-cl_ypos)**2).gt.cl_rast*0.5) goto 9 
-           v(3)=cl_zpos+randnum*cl_zwidth
+           v(3)=cl_zpos+(randnum-0.5)*cl_zwidth
           gelex=v(1)
           geley=v(2)
           gelez=v(3)
@@ -1463,7 +1272,7 @@ c101      FORMAT(2x,I10,2I6,2F11.2,I5,F10.3,2I5,2E14.7,2F6.2)
      6                                                   ,(V(jl),jl=1,3)
                  write (41,112) 2,radphi,1,(k(2,jl),jl=2,4),(P(2,jl),jl=1,3),radxb_true,radq2_true
      6                                                   ,(V(jl),jl=1,3)
-                 write (41,113) 3,plu(3),1,(k(3,jl),jl=2,4),(P(3,jl),jl=1,4),bornweight
+                 write (41,113) 3,ebeamff,1,(k(3,jl),jl=2,4),(P(3,jl),jl=1,4),bornweight
      6                                                   ,(V(jl),jl=1,3)
 
                  if (jj.eq.4.) then
@@ -1998,7 +1807,12 @@ c
       if( xb.le.xmin1 .or. xb.gt.xmax1 ) istatus=1           !    x  out of range
       if( del2.ge.del2min .or. del2.le.del2max ) istatus=2   ! delta out of range
       yb=nu/Ed
-      if(yb.gt.cl_ymax) istatus=3                               ! y<ymax
+      if( isnan(xb).or.isnan(Q2).or.isnan(del2).or.isnan(Phi_e).or.isnan(Phi_g)) istatus=3          ! y<ymax condition is redundant. if nan is passed from the radgen, skip the loop.
+      if (istatus.gt.0) then
+      dsigma = 0
+      return
+      endif
+
       call dvcsycol(del2,xb,Q2,ycol)
 
       Phi_gb=pi - Phi_g
@@ -2346,9 +2160,11 @@ c
       phip = phigd 
       phipel = phield 
 *
-       call nuclFF( del2d )
-C       call nuclFF_YAHL( del2d )
-
+      if (cl_global) then
+      call nuclFF_YAHL( del2d )
+      else
+      call nuclFF( del2d )
+      endif
 *
       y1eps=1D0 - yb - yb*yb*eps2/4D0
       sqy1eps=sqrt(y1eps)
@@ -2968,24 +2784,6 @@ C
       return
       end
 
-      subroutine V3subd( A, B, C)
-      implicit double precision (A-H,O-Z)
-      dimension A(3), B(3), C(3)
-      do i = 1,3
-        C(i) = A(i) - B(i)
-      enddo
-      end
-
-      double precision function V3dotd( A, B)
-      implicit double precision (A-H,O-Z)
-      dimension A(3), B(3)
-      S = 0D0
-      do i = 1,3
-        S = S + A(i)*B(i)
-      enddo
-      V3dotd = S
-      end
-
       subroutine nuclFF_YAHL( del2 )
 C from the supplementary material of
 C Zhihong Ye, John R. Arrington, Richard J.Hill and Gabriel Lee 
@@ -2999,7 +2797,7 @@ C
       implicit double precision (A-H,O-Z)
 #include "dvcs.inc"
       common/formfac/ F1pn(2), F2pn(2)
-      double precision Mv, kp, kn
+      double precision Mv, kp, mu_n
       double precision z, a0(4), a1(4), a2(4), a3(4), a4(4), a5(4), a6(4), a7(4), a8(4), a9(4), a10(4), a11(4), a12(4)
       parameter (Mv = 0.843D0, kp = 1.79285D0, mu_n = -1.91D0, tcut = 4*0.13957**2, t0 = -0.7)
 C
@@ -3034,6 +2832,25 @@ C
       return
       end
 
+
+      subroutine V3subd( A, B, C)
+      implicit double precision (A-H,O-Z)
+      dimension A(3), B(3), C(3)
+      do i = 1,3
+        C(i) = A(i) - B(i)
+      enddo
+      end
+
+      double precision function V3dotd( A, B)
+      implicit double precision (A-H,O-Z)
+      dimension A(3), B(3)
+      S = 0D0
+      do i = 1,3
+        S = S + A(i)*B(i)
+      enddo
+      V3dotd = S
+      end
+c
       subroutine resetmom()
 c
 C     set to 0 all moments
@@ -3282,7 +3099,7 @@ c
       return
       end
 c
-      subroutine getphoton(xbd,Q2d,del2d,phield,phigd)
+      subroutine getphoton(xbd,Q2d,del2d,phield,phigd,costgg)
 c
 C     set to 0 all moments
       implicit none
@@ -3313,8 +3130,8 @@ c      if(Ed.ne.cl_beam_energy) print *,'dans getphoton : Ed=',Ed
 c      if((PhRAD(4).gt.0.).and.(ichannel.eq.2)) Ed=cl_beam_energy-PhRAD(4)
 ccc- Hyon-Suk
       yb = nu/Ed
-      Esc = Ed - nu
-      costel = 1D0 - Q2d/(2D0*Ed*Esc)
+      Esc = cl_beam_energy - nu
+      costel = 1D0 - Q2d/(2D0*cl_beam_energy*Esc)
       sintel = sqrt(1D0 - costel**2)
       cosphe=cos(phield)
       sinphe=sin(phield)
@@ -3329,7 +3146,7 @@ c
                PhRAD(1) = 0.
                PhRAD(2) = 0.
                PhRAD(3) = PhRAD(4)
-               Ed=cl_beam_energy-PhRAD(4)
+               Ed=Ed-PhRAD(4)
             endif
          endif
       endif
@@ -3337,7 +3154,7 @@ c
 c
       V3k1(1) = 0D0
       V3k1(2) = 0D0
-      V3k1(3) = Ed
+      V3k1(3) = Ed ! Use the effective beam energy after the energy loss.
 
       V3k2(1) = Esc*sintel*cosphe
       V3k2(2) = Esc*sintel*sinphe   !0D0
@@ -3362,6 +3179,8 @@ c
             endif
          else
             call V3subd( V3k1, V3k2, V3q)
+            nu = Ed-Esc
+            qmod =  sqrt(V3q(1)**2 + V3q(2)**2 + V3q(3)**2)
          endif
       else
             call V3subd( V3k1, V3k2, V3q)
