@@ -18,7 +18,7 @@ Much of the initial set up for this repository comes from Sangbaek Lee (https://
 ## Installation
 
 ```bash
-git clone https://github.com/tbhayward/dvcs_simulation.git
+git clone https://github.com/maggiefekerr/dvcs_simulation.git
 cd dvcs_simulation
 chmod +x install.sh
 ./install.sh
